@@ -12,6 +12,7 @@ async function run() {
   // Tell folks they can merge
   if (context.eventName === "pull_request_target") {
     commentOnMergablePRs()
+    new Actor().mergeIfHasAccess();
   }
 
   // Merge if they say they have access
@@ -55,31 +56,41 @@ async function commentOnMergablePRs() {
     process.exit(0)
   }
 
-  // Determine who has access to merge every file in this PR
-  const ownersWhoHaveAccessToAllFilesInPR = []
-  codeowners.users.forEach(owner => {
-    const filesWhichArentOwned = getFilesNotOwnedByCodeOwner(owner, changedFiles, cwd)
-    if (filesWhichArentOwned.length === 0) ownersWhoHaveAccessToAllFilesInPR.push(owner)
+  // Get a list of all open pull requests to current repository with base branch set as main
+  const openPullRequests = await octokit.pulls.list({
+    owner: thisRepo.owner,
+    repo: thisRepo.repo,
+    state: "open",
+    base: 'main'
   })
 
-  if (!ownersWhoHaveAccessToAllFilesInPR.length) {
-    console.log("This PR does not have any code-owners who own all of the files in the PR")
-    listFilesWithOwners(changedFiles, cwd)
-
-    const labelToAdd = core.getInput('if_no_maintainers_add_label')
-    if (labelToAdd) {
-      const labelConfig = { name: labelToAdd, color: Math.random().toString(16).slice(2, 8) }
-      await createOrAddLabel(octokit, { ...thisRepo, id: pr.number }, labelConfig)
+  // Get a dictionary of users assigned to PRs as key and times assigned as value
+  let assignedToPRs = {}
+  for (const pr of openPullRequests.data) {
+    if (pr.assignees.length) {
+      for (const assignee of pr.assignees) {
+        assignedToPRs[assignee.login] = assignedToPRs[assignee.login] || 0
+        assignedToPRs[assignee.login] += 1
+      }
     }
-
-    const assignees = core.getInput('if_no_maintainers_assign')
-    if (assignees) {
-      const usernames = assignees.split(" ").map(u => u.replace("@", "").trim())
-      await octokit.issues.addAssignees({ ...thisRepo, issue_number: pr.number, assignees: usernames})
-    }
-
-    process.exit(0)
   }
+
+  // Shuffle codeowners list to randomise who gets the assignation.
+  // This is to prevent people from getting the same assignation every time.
+  codeowners.users.sort(() => Math.random() - 0.5)
+
+  // Randomly get a user to assign to this PR with the minimum number of PRs assigned to them
+  let assignee = null
+  let minPRs = Number.MAX_SAFE_INTEGER
+  for (const user in codeowners.users) {
+    if (assignedToPRs[user] < minPRs) {
+      assignee = user
+      minPRs = assignedToPRs[user]
+    }
+  }
+  core.info(`Arbitrary choosen ${assignee} as assigned reviewer! PR assigned: ${minPRs}`)
+  await octokit.issues.addAssignees({ ...thisRepo, issue_number: pr.number, assignees: [assignee]})
+
 
   const ourSignature = "<!-- Message About Merging -->"
   const comments = await octokit.issues.listComments({ ...thisRepo, issue_number: pr.number })
@@ -89,10 +100,9 @@ async function commentOnMergablePRs() {
     process.exit(0)
   }
 
-  const owners = new Intl.ListFormat().format(ownersWhoHaveAccessToAllFilesInPR);
-  const message = `Thanks for the PR!
+  const message = `Thanks for the PR! :rocket:
 
-This section of the codebase is owned by ${owners} - if they write a comment saying "LGTM" then it will be merged.
+  Owners will be reviewing this PR. Assigned reviewer: ${assignee}
 ${ourSignature}`
 
   await octokit.issues.createComment({ ...thisRepo, issue_number: pr.number, body: message });
@@ -102,13 +112,6 @@ ${ourSignature}`
     const labelConfig = { name: label, color: Math.random().toString(16).slice(2, 8) }
     await createOrAddLabel(octokit, { ...thisRepo, id: pr.number }, labelConfig)
   }
-}
-
-/**
- * @param {string[]} files
- */
-function pathListToMarkdown(files) {
-  return files.map(i => `* [\`${i}\`](https://github.com/${context.repo.owner}/${context.repo.repo}/tree/HEAD${i})`).join("\n");
 }
 
 function getPayloadBody() {
@@ -135,20 +138,27 @@ class Actor {
 
     const changedFiles = await getPRChangedFiles(octokit, thisRepo, issue.number)
     core.info(`Changed files: \n - ${changedFiles.join("\n - ")}`)
+    let changedNotApprovedFiles = changedFiles;
 
-    const filesWhichArentOwned = getFilesNotOwnedByCodeOwner("@" + sender, changedFiles, cwd)
-    if (filesWhichArentOwned.length !== 0) {
-      console.log(`@${sender} does not have access to \n - ${filesWhichArentOwned.join("\n - ")}\n`)
+    const comments = await octokit.issues.listComments({ ...thisRepo, issue_number: issue.number })
+    const existingApprovalComments = comments.data.find(c => c.body.toLowerCase().includes('lgtm'))
+    if (existingApprovalComments) {
+      console.log("There is an existing approval comment")
+      // Get files which have not been approved yet!
+      for (const comment in existingApprovalComments) {
+        changedNotApprovedFiles = getFilesNotOwnedByCodeOwner("@" + comment.user.login, changedNotApprovedFiles, cwd)
+      }
+
+    }
+    changedNotApprovedFiles = getFilesNotOwnedByCodeOwner("@" + sender, changedNotApprovedFiles, cwd)
+    if (changedNotApprovedFiles.length !== 0) {
+      console.log(`Not approved changes: \n - ${changedNotApprovedFiles.join("\n - ")}\n`)
       listFilesWithOwners(changedFiles, cwd)
-      await octokit.issues.createComment({ ...thisRepo, issue_number: issue.number, body: `Sorry @${sender}, you don't have access to these files: ${pathListToMarkdown(filesWhichArentOwned)}.` })
+      await octokit.issues.createComment({ ...thisRepo, issue_number: issue.number, body: `Missing approvals for:\n\n${getFilesWithOwners(changedNotApprovedFiles)}.` })
       return
     }
 
     const prInfo = await octokit.pulls.get({ ...thisRepo, pull_number: issue.number })
-    if (prInfo.data.state.toLowerCase() !== "open") {
-      await octokit.issues.createComment({ ...thisRepo, issue_number: issue.number, body: `Sorry @${sender}, this PR isn't open.` });
-      return
-    }
     return prInfo
   }
 
@@ -177,15 +187,15 @@ class Actor {
       .find(s => s.state !== "success")
 
     if (failedStatus) {
-      await octokit.issues.createComment({ ...thisRepo, issue_number: issue.number, body: `Sorry @${sender}, this PR could not be merged because it wasn't green. Blocked by [${failedStatus.context}](${failedStatus.target_url}): '${failedStatus.description}'.` });
+      // await octokit.issues.createComment({ ...thisRepo, issue_number: issue.number, body: `Sorry @${sender}, this PR could not be merged because it wasn't green. Blocked by [${failedStatus.context}](${failedStatus.target_url}): '${failedStatus.description}'.` });
       return
     }
 
     core.info(`Creating comments and merging`)
     try {
       // @ts-ignore
-      await octokit.pulls.merge({ ...thisRepo, pull_number: issue.number, merge_method: core.getInput('merge_method') || 'merge' });
-      await octokit.issues.createComment({ ...thisRepo, issue_number: issue.number, body: `Merging because @${sender} is a code-owner of all the changes - thanks!` });
+      await octokit.pulls.merge({ ...thisRepo, pull_number: issue.number, merge_method: core.getInput('merge_method') || 'squash' });
+      await octokit.issues.createComment({ ...thisRepo, issue_number: issue.number, body: `Merging - thanks for the contribution!` });
     } catch (error) {
       core.info(`Merging (or commenting) failed:`)
       core.error(error)
@@ -264,6 +274,19 @@ function listFilesWithOwners(files, cwd) {
   console.log(readFileSync(codeowners.codeownersFilePath, "utf8"))
 }
 
+function getFilesWithOwners(files, cwd) {
+    let returnStr = ""
+    const codeowners = new Codeowners(cwd);
+    console.log("\nKnown code-owners for changed files:")
+    for (const file of files) {
+      const relative = file.startsWith("/") ? file.slice(1) : file
+      let owners = codeowners.getOwner(relative);
+      returnStr += `- ${file} (${new Intl.ListFormat().format(owners)})\n`
+    }
+    return returnStr
+  }
+
+
 function findCodeOwnersForChangedFiles(changedFiles, cwd)  {
   const owners = new Set()
   const labels = new Set()
@@ -271,7 +294,7 @@ function findCodeOwnersForChangedFiles(changedFiles, cwd)  {
 
   for (const file of changedFiles) {
     const relative = file.startsWith("/") ? file.slice(1) : file
-    const filesOwners = codeowners.getOwner(relative);
+    for (const entry in codeowners.ownerEntries)
     filesOwners.forEach(o => {
       if (o.startsWith("@")) owners.add(o)
       if (o.startsWith("[")) labels.add(o.slice(1, o.length-1))
