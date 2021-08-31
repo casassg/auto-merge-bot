@@ -148,12 +148,12 @@ class Actor {
     let changedNotApprovedFiles = changedFiles;
 
     const comments = await octokit.issues.listComments({ ...thisRepo, issue_number: issue.number })
-    const existingApprovalComments = comments.data.find(c => c.body.toLowerCase().includes('lgtm'))
+    const existingApprovalComments = comments.data.filter(c => c.body.toLowerCase().includes('lgtm'))
     if (existingApprovalComments) {
       console.log("There is an existing approval comment")
       // Get files which have not been approved yet!
-      for (const comment in existingApprovalComments) {
-        changedNotApprovedFiles = getFilesNotOwnedByCodeOwner("@" + comment.user.login, changedNotApprovedFiles, cwd)
+      for (const c in existingApprovalComments) {
+        changedNotApprovedFiles = getFilesNotOwnedByCodeOwner("@" + c.user.login, changedNotApprovedFiles, cwd)
       }
 
     }
