@@ -147,16 +147,19 @@ class Actor {
     core.info(`Changed files: \n - ${changedFiles.join("\n - ")}`)
     let changedNotApprovedFiles = changedFiles;
 
-    const comments = await octokit.issues.listComments({ ...thisRepo, issue_number: issue.number })
-    const existingApprovalComments = comments.data.filter(c => c.body.toLowerCase().includes('lgtm'))
-    if (existingApprovalComments) {
-      console.log("There is an existing approval comment")
-      // Get files which have not been approved yet!
-      for (const c in existingApprovalComments) {
-        changedNotApprovedFiles = getFilesNotOwnedByCodeOwner("@" + c.user.login, changedNotApprovedFiles, cwd)
-      }
+    // const comments = await octokit.issues.listComments({ ...thisRepo, issue_number: issue.number })
+    // Get a list of all comments that contain lgtm in the body for a GitHub issue with issue.number with pagination
 
-    }
+
+
+    const { data: comments } = await octokit.issues.listComments({ ...thisRepo, issue_number: issue.number })
+    console.log(comments)
+    comments.forEach(comment => {
+      if (comment.body.includes("lgtm")) {
+        changedNotApprovedFiles = getFilesNotOwnedByCodeOwner("@" + comment.user.login, changedNotApprovedFiles, cwd)
+      }
+    });
+    
     changedNotApprovedFiles = getFilesNotOwnedByCodeOwner("@" + issue.user.login, changedNotApprovedFiles, cwd)
     changedNotApprovedFiles = getFilesNotOwnedByCodeOwner("@" + sender, changedNotApprovedFiles, cwd)
     if (changedNotApprovedFiles.length !== 0) {
