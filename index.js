@@ -11,8 +11,8 @@ async function run() {
   let returnMessage = "";
   // Tell folks they can merge
   if (context.eventName === "pull_request_target") {
-    commentOnMergablePRs()
-    new Actor().mergeIfHasAccess();
+    await commentOnMergablePRs()
+    await new Actor().mergeIfHasAccess();
   }
 
   // Merge if they say they have access
@@ -153,7 +153,6 @@ class Actor {
 
 
     const { data: comments } = await octokit.issues.listComments({ ...thisRepo, issue_number: issue.number })
-    console.log(comments)
     comments.forEach(comment => {
       if (comment.body.includes("lgtm")) {
         changedNotApprovedFiles = getFilesNotOwnedByCodeOwner("@" + comment.user.login, changedNotApprovedFiles, cwd)
