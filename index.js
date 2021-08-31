@@ -156,14 +156,14 @@ class Actor {
     const { data: comments } = await octokit.issues.listComments({ ...thisRepo, issue_number: issue.number })
     let haslgtm = false;
     comments.forEach(comment => {
-      if (comment.body.includes("lgtm") && comment.user.login !== issue.user.login) {
+      if (comment.body.includes("lgtm") && comment.user.login !== issue.user.login && !comment.body.includes("<!-- Message About Merging -->")) {
         haslgtm = true;
         core.info(`Found lgtm comment from ${comment.user.login}`)
         changedNotApprovedFiles = getFilesNotOwnedByCodeOwner("@" + comment.user.login, changedNotApprovedFiles, cwd)
       }
     });
     if (!haslgtm){
-      core.setFailed(`Required to have at least 1 lgtm from someone else thank yourself!`); 
+      core.setFailed(`Required to have at least 1 lgtm from someone else than yourself!`); 
       process.exit(1)
     }
     
