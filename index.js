@@ -64,8 +64,8 @@ async function commentOnMergablePRs() {
   const comments = await octokit.issues.listComments({ ...thisRepo, issue_number: pr.number })
   const existingComment = comments.data.find(c => c.body.includes(ourSignature))
   if (existingComment) {
-    console.log("There is an existing comment")
-    process.exit(0)
+    console.log("There is an existing comment. Skipping adding welcome message!")
+    return
   }
 
 
