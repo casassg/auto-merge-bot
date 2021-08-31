@@ -8,22 +8,26 @@ const {readFileSync} = require("fs");
 // Effectively the main function
 async function run() {
   core.info("Running version 1.6.0")
-
+  let returnMessage = "";
   // Tell folks they can merge
   if (context.eventName === "pull_request_target") {
     commentOnMergablePRs()
-    new Actor().mergeIfHasAccess();
+    returnMessage = await new Actor().mergeIfHasAccess();
   }
 
   // Merge if they say they have access
   if (context.eventName === "issue_comment" || context.eventName === "pull_request_review") {
     const bodyLower = getPayloadBody().toLowerCase();
-    if (bodyLower.includes("lgtm")) {
-      new Actor().mergeIfHasAccess();
+    if (bodyLower.includes("/lgtm")) {
+      returnMessage = await new Actor().mergeIfHasAccess();
     } else if (bodyLower.includes("@github-actions close")) {
       new Actor().closePROrIssueIfInCodeowners();
     } else {
       console.log("Doing nothing because the body does not include a command")
+    }
+    if (returnMessage) {
+      console.log(returnMessage)
+      core.setFailed(returnMessage);
     }
   }
 }
@@ -103,6 +107,8 @@ async function commentOnMergablePRs() {
   const message = `Thanks for the PR! :rocket:
 
   Owners will be reviewing this PR. Assigned reviewer: ${assignee}
+
+  Approve using \`/lgtm\` to merge.
 ${ourSignature}`
 
   await octokit.issues.createComment({ ...thisRepo, issue_number: pr.number, body: message });
@@ -150,6 +156,7 @@ class Actor {
       }
 
     }
+    changedNotApprovedFiles = getFilesNotOwnedByCodeOwner("@" + issue.user.login, changedNotApprovedFiles, cwd)
     changedNotApprovedFiles = getFilesNotOwnedByCodeOwner("@" + sender, changedNotApprovedFiles, cwd)
     if (changedNotApprovedFiles.length !== 0) {
       console.log(`Not approved changes: \n - ${changedNotApprovedFiles.join("\n - ")}\n`)
@@ -165,15 +172,14 @@ class Actor {
   async mergeIfHasAccess() {
     const prInfo = await this.getTargetPRIfHasAccess()
     if (!prInfo) {
-      return
+      return `Missing approvals for PR to be merged`
     }
 
     const { octokit, thisRepo, issue, sender } = this;
 
     // Don't try merge unmergable stuff
     if (!prInfo.data.mergeable) {
-      await octokit.issues.createComment({ ...thisRepo, issue_number: issue.number, body: `Sorry @${sender}, this PR has merge conflicts. They'll need to be fixed before this can be merged.` });
-      return
+      return `Sorry, this PR has merge conflicts. They'll need to be fixed before this can be merged.`
     }
 
     // Don't merge red PRs
@@ -188,7 +194,7 @@ class Actor {
 
     if (failedStatus) {
       // await octokit.issues.createComment({ ...thisRepo, issue_number: issue.number, body: `Sorry @${sender}, this PR could not be merged because it wasn't green. Blocked by [${failedStatus.context}](${failedStatus.target_url}): '${failedStatus.description}'.` });
-      return
+      return `Sorry, this PR could not be merged because it wasn't green. Blocked by [${failedStatus.context}](${failedStatus.target_url}): '${failedStatus.description}'.`
     }
 
     core.info(`Creating comments and merging`)
@@ -280,7 +286,7 @@ function getFilesWithOwners(files, cwd) {
     console.log("\nKnown code-owners for changed files:")
     for (const file of files) {
       const relative = file.startsWith("/") ? file.slice(1) : file
-      let owners = codeowners.getOwner(relative);
+      let owners = codeowners.getOwner(relative).map(o => o.replace("@", ""));
       returnStr += `- ${file} (${new Intl.ListFormat().format(owners)})\n`
     }
     return returnStr
@@ -294,8 +300,8 @@ function findCodeOwnersForChangedFiles(changedFiles, cwd)  {
 
   for (const file of changedFiles) {
     const relative = file.startsWith("/") ? file.slice(1) : file
-    for (const entry in codeowners.ownerEntries)
-    filesOwners.forEach(o => {
+    const fileOwners = codeowners.getOwner(relative)
+    fileOwners.forEach(o => {
       if (o.startsWith("@")) owners.add(o)
       if (o.startsWith("[")) labels.add(o.slice(1, o.length-1))
     })
