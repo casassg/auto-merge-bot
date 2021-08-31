@@ -95,12 +95,13 @@ async function commentOnMergablePRs() {
   // Randomly get a user to assign to this PR with the minimum number of PRs assigned to them
   let assignee = null
   let minPRs = Number.MAX_SAFE_INTEGER
-  for (const user in codeowners.users) {
+  codeowners.users.forEach(user => {
     if ((assignedToPRs[user] || 0) < minPRs) {
       assignee = user
       minPRs = assignedToPRs[user]
     }
-  }
+  })
+  
   core.info(`Arbitrary choosen ${assignee} as assigned reviewer! PR assigned: ${minPRs}`)
   await octokit.issues.addAssignees({ ...thisRepo, issue_number: pr.number, assignees: [assignee]})
 
