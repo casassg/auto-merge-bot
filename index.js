@@ -164,7 +164,7 @@ class Actor {
       let body = `Missing approvals for:\n\n${getFilesWithOwners(changedNotApprovedFiles)}`
       const comments = await octokit.issues.listComments({ ...thisRepo, issue_number: issue.number })
       const existingComments = comments.data.find(c => c.body == body)
-      if (existingComments.length != 0) {
+      if (!existingComments) {
         await octokit.issues.createComment({ ...thisRepo, issue_number: issue.number, body: `Missing approvals for:\n\n${getFilesWithOwners(changedNotApprovedFiles)}` })
       }
       return
