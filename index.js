@@ -161,7 +161,12 @@ class Actor {
     if (changedNotApprovedFiles.length !== 0) {
       console.log(`Not approved changes: \n - ${changedNotApprovedFiles.join("\n - ")}\n`)
       listFilesWithOwners(changedFiles, cwd)
-      await octokit.issues.createComment({ ...thisRepo, issue_number: issue.number, body: `Missing approvals for:\n\n${getFilesWithOwners(changedNotApprovedFiles)}.` })
+      let body = `Missing approvals for:\n\n${getFilesWithOwners(changedNotApprovedFiles)}`
+      const comments = await octokit.issues.listComments({ ...thisRepo, issue_number: issue.number })
+      const existingComments = comments.data.find(c => c.body == body)
+      if (existingComments.length != 0) {
+        await octokit.issues.createComment({ ...thisRepo, issue_number: issue.number, body: `Missing approvals for:\n\n${getFilesWithOwners(changedNotApprovedFiles)}` })
+      }
       return
     }
 
