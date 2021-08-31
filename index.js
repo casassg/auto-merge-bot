@@ -12,14 +12,14 @@ async function run() {
   // Tell folks they can merge
   if (context.eventName === "pull_request_target") {
     commentOnMergablePRs()
-    returnMessage = await new Actor().mergeIfHasAccess();
+    new Actor().mergeIfHasAccess();
   }
 
   // Merge if they say they have access
   if (context.eventName === "issue_comment" || context.eventName === "pull_request_review") {
     const bodyLower = getPayloadBody().toLowerCase();
     if (bodyLower.includes("/lgtm")) {
-      returnMessage = await new Actor().mergeIfHasAccess();
+      new Actor().mergeIfHasAccess();
     } else if (bodyLower.includes("@github-actions close")) {
       new Actor().closePROrIssueIfInCodeowners();
     } else {
@@ -60,6 +60,15 @@ async function commentOnMergablePRs() {
     process.exit(0)
   }
 
+  const ourSignature = "<!-- Message About Merging -->"
+  const comments = await octokit.issues.listComments({ ...thisRepo, issue_number: pr.number })
+  const existingComment = comments.data.find(c => c.body.includes(ourSignature))
+  if (existingComment) {
+    console.log("There is an existing comment")
+    process.exit(0)
+  }
+
+
   // Get a list of all open pull requests to current repository with base branch set as main
   const openPullRequests = await octokit.pulls.list({
     owner: thisRepo.owner,
@@ -87,7 +96,7 @@ async function commentOnMergablePRs() {
   let assignee = null
   let minPRs = Number.MAX_SAFE_INTEGER
   for (const user in codeowners.users) {
-    if (assignedToPRs[user] < minPRs) {
+    if ((assignedToPRs[user] || 0) < minPRs) {
       assignee = user
       minPRs = assignedToPRs[user]
     }
@@ -95,14 +104,6 @@ async function commentOnMergablePRs() {
   core.info(`Arbitrary choosen ${assignee} as assigned reviewer! PR assigned: ${minPRs}`)
   await octokit.issues.addAssignees({ ...thisRepo, issue_number: pr.number, assignees: [assignee]})
 
-
-  const ourSignature = "<!-- Message About Merging -->"
-  const comments = await octokit.issues.listComments({ ...thisRepo, issue_number: pr.number })
-  const existingComment = comments.data.find(c => c.body.includes(ourSignature))
-  if (existingComment) {
-    console.log("There is an existing comment")
-    process.exit(0)
-  }
 
   const message = `Thanks for the PR! :rocket:
 
@@ -162,12 +163,8 @@ class Actor {
       console.log(`Not approved changes: \n - ${changedNotApprovedFiles.join("\n - ")}\n`)
       listFilesWithOwners(changedFiles, cwd)
       let body = `Missing approvals for:\n\n${getFilesWithOwners(changedNotApprovedFiles)}`
-      const comments = await octokit.issues.listComments({ ...thisRepo, issue_number: issue.number })
-      const existingComments = comments.data.find(c => c.body == body)
-      if (!existingComments) {
-        await octokit.issues.createComment({ ...thisRepo, issue_number: issue.number, body: `Missing approvals for:\n\n${getFilesWithOwners(changedNotApprovedFiles)}` })
-      }
-      return
+      core.setFailed(body); 
+      process.exit(1)
     }
 
     const prInfo = await octokit.pulls.get({ ...thisRepo, pull_number: issue.number })
@@ -177,14 +174,16 @@ class Actor {
   async mergeIfHasAccess() {
     const prInfo = await this.getTargetPRIfHasAccess()
     if (!prInfo) {
-      return `Missing approvals for PR to be merged`
+      core.setFailed(`Missing approvals for PR to be merged`); 
+      process.exit(1)
     }
 
     const { octokit, thisRepo, issue, sender } = this;
 
     // Don't try merge unmergable stuff
     if (!prInfo.data.mergeable) {
-      return `Sorry, this PR has merge conflicts. They'll need to be fixed before this can be merged.`
+      core.setFailed(`Sorry, this PR has merge conflicts. They'll need to be fixed before this can be merged.`);
+      process.exit(1)
     }
 
     // Don't merge red PRs
@@ -198,22 +197,21 @@ class Actor {
       .find(s => s.state !== "success")
 
     if (failedStatus) {
-      // await octokit.issues.createComment({ ...thisRepo, issue_number: issue.number, body: `Sorry @${sender}, this PR could not be merged because it wasn't green. Blocked by [${failedStatus.context}](${failedStatus.target_url}): '${failedStatus.description}'.` });
-      return `Sorry, this PR could not be merged because it wasn't green. Blocked by [${failedStatus.context}](${failedStatus.target_url}): '${failedStatus.description}'.`
+      core.setFailed(`Sorry, this PR could not be merged because it wasn't green. Blocked by [${failedStatus.context}](${failedStatus.target_url}): '${failedStatus.description}'.`)
+      process.exit(1)
     }
 
     core.info(`Creating comments and merging`)
     try {
       // @ts-ignore
       await octokit.pulls.merge({ ...thisRepo, pull_number: issue.number, merge_method: core.getInput('merge_method') || 'squash' });
-      await octokit.issues.createComment({ ...thisRepo, issue_number: issue.number, body: `Merging - thanks for the contribution!` });
+      await octokit.issues.createComment({ ...thisRepo, issue_number: issue.number, body: `Merged - thanks for the contribution! :tada:` });
     } catch (error) {
       core.info(`Merging (or commenting) failed:`)
       core.error(error)
       core.setFailed("Failed to merge")
-
-      const linkToCI = `https://github.com/${thisRepo.owner}/${thisRepo.repo}/runs/${process.env.GITHUB_RUN_ID}?check_suite_focus=true`
-      await octokit.issues.createComment({ ...thisRepo, issue_number: issue.number, body: `There was an issue merging, maybe try again ${sender}. <a href="${linkToCI}">Details</a>` });
+      process.exit(1)
+      
     }
   }
 
