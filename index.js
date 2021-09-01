@@ -276,7 +276,7 @@ async function updateWelcomeComment(octokit, repoDeets, prNumber, message) {
     repoDeets,
     prNumber
   );
-  core.info(JSON.stringify(welcomeComment));
+  core.info(`Welcome comment update to: ${message}`);
   octokit.issues.updateComment({
     ...repoDeets,
     comment_id: welcomeComment.id,
