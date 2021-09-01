@@ -312,8 +312,14 @@ async function canBeMerged(
       codeowners
     );
   });
+  // check files PR owner can merge.
+  changedFilesNotApproved = getFilesNotOwnedByCodeOwner(
+    "@" + pr.user.login,
+    changedFilesNotApproved,
+    codeowners
+  );
 
-  const { users: missingOwners } = getCodeOwnersAndLabels(
+  let { users: missingOwners } = getCodeOwnersAndLabels(
     changedFilesNotApproved,
     codeowners
   );
