@@ -4,7 +4,8 @@
   "main": "index.js",
   "license": "MIT",
   "scripts": {
-    "test": "npx jest"
+    "test": "npx jest",
+    "dist": "ncc build index.js --license licenses.txt"
   },
   "dependencies": {
     "@actions/core": "^1.2.4",
@@ -12,5 +13,8 @@
     "@octokit/webhooks": "^7.9.3",
     "@types/jest": "^26.0.9",
     "codeowners": "^4.2.0"
+  },
+  "devDependencies": {
+    "@vercel/ncc": "^0.30.0"
   }
 }

@@ -100,6 +100,7 @@ There are four options available at the moment:
 ### Dev
 
 - Install deps: `yarn install`
+- Prepare distribution: `yarn run dist`
 
 ToDo(casassg): add tests back.
 
