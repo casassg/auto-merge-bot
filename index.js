@@ -116,9 +116,9 @@ async function assignReviewer(octokit, owners, repoDeeets, pr) {
 
   // remove pr owner from list
   owners = owners.filter((o) => o !== pr.user.login);
-  
+
   // Randomly get a user to assign to this PR with the minimum number of PRs assigned to them
-  let assignee = null;
+  let assignee = '';
   let minPRs = Number.MAX_SAFE_INTEGER;
   owners.forEach((user) => {
     if ((assignedToPRs[user] || 0) < minPRs) {
@@ -130,11 +130,14 @@ async function assignReviewer(octokit, owners, repoDeeets, pr) {
   core.info(
     `Arbitrary choosen ${assignee} as assigned reviewer! PR assigned: ${minPRs}`
   );
-  await octokit.issues.addAssignees({
-    ...repoDeeets,
-    issue_number: pr.number,
-    assignees: [assignee],
-  });
+  if (assignee !== '') {
+    const assigneUsername = assignee.replace("@", "")
+    await octokit.issues.addAssignees({
+      ...repoDeeets,
+      issue_number: pr.number,
+      assignees: [assigneUsername],
+    });
+  }
   return assignee;
 }
 
