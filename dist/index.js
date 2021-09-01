@@ -17,7 +17,9 @@ const mergeReadyLabel = { name: "merge-ready", color: "00ff00" };
 const needsLgtmLabel = { name: "needs-lgtm", color: "FFA500" };
 const needsMergeLabel = { name: "needs-merge", color: "FFA500" };
 const lgtmLabel = { name: "lgtm", color: "00FFFF" };
+const ownersWillReviewMessage = `Thanks for the PR!  :rocket:
 
+Owners will be reviewing this PR.`;
 async function getChangedFiles(octokit, repoDeets, prNumber) {
   // https://developer.github.com/v3/pulls/#list-pull-requests-files
   const options = octokit.pulls.listFiles.endpoint.merge({
@@ -386,15 +388,11 @@ async function run() {
       core.info(`Assigned reviewer: ${assignee}. Sending welcome message!`);
       let message = "";
       if (assignee) {
-        message = `Thanks for the PR! :rocket:
-    
-Owners will be reviewing this PR. Assigned reviewer: ${assignee}
+        message = `${ownersWillReviewMessage}. Assigned reviewer: ${assignee}
   
 Approve using \`/lgtm\` and mark for automatic merge by using \`/merge\`.`;
       } else {
-        message = `Thanks for the PR! :rocket:
-    
-Owners will be reviewing this PR. No automatic reviewer could be found.`;
+        message = `${ownersWillReviewMessage}. No automatic reviewer could be found.`;
       }
       await welcomeMessage(octokit, repoDeets, pr.number, message);
     }
@@ -472,9 +470,7 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
       octokit,
       repoDeets,
       pr.number,
-      `Thanks for the PR!  :rocket:
-
-Owners will be reviewing this PR.`
+      ownersWillReviewMessage
     );
   }
   const approved = await isApproved(
