@@ -79,7 +79,7 @@ async function addLabel(octokit, repoDeets, labelConfig, prNumber) {
 }
 
 async function isCheckSuiteGreen(octokit, repoDeeets, pr) {
-  let waitForCompletion =  true;
+  let waitForCompletion = true;
   let inprogressRun = null;
   let failedRun = null;
   while (waitForCompletion) {
@@ -88,11 +88,20 @@ async function isCheckSuiteGreen(octokit, repoDeeets, pr) {
       ref: `pull/${pr.number}/head`,
     });
     // Check if there's a run in progress or failed
-    inprogressRun = checkSuites.data.check_runs.find( (s) => s.status === "in_progress" && s.name !== process.env.GITHUB_JOB);
-    failedRun = checkSuites.data.check_runs.find( (s) => s.status === "completed" && s.conclusion === "failure" && s.name !== process.env.GITHUB_JOB);
+    inprogressRun = checkSuites.data.check_runs.find(
+      (s) => s.status === "in_progress" && s.name !== process.env.GITHUB_JOB
+    );
+    failedRun = checkSuites.data.check_runs.find(
+      (s) =>
+        s.status === "completed" &&
+        s.conclusion === "failure" &&
+        s.name !== process.env.GITHUB_JOB
+    );
     // if failed, returne false
-    if (failedRun){
-      core.info( `Check suite status: ${failedRun.status} (${failedRun.output.title})`)
+    if (failedRun) {
+      core.info(
+        `Check suite status: ${failedRun.status} (${failedRun.output.title})`
+      );
       return false;
     }
     // if no in progress, then we are good to go!
@@ -101,27 +110,28 @@ async function isCheckSuiteGreen(octokit, repoDeeets, pr) {
     }
     // Wait for a bit before checking again.
     else {
-      core.info( `Check suite status: ${inprogressRun.status} (${inprogressRun.output.title})`)
-      core.info('Sleeping for 5000 ms')
-      await new Promise(r => setTimeout(r, 5000));
+      core.info(
+        `Check suite status: ${inprogressRun.status} (${inprogressRun.output.title})`
+      );
+      core.info("Sleeping for 5000 ms");
+      await new Promise((r) => setTimeout(r, 5000));
     }
-    
   }
   return true;
-  
+
   console.log(process.env.GITHUB_ACTION);
   console.log(process.env.GITHUB_JOB);
   console.log(process.env.GITHUB_RUN_NUMBER);
   console.log(process.env.GITHUB_WORKFLOW);
   console.log(process.env.GITHUB_RUN_ID);
-  if (failedSuite){
+  if (failedSuite) {
     console.log(failedSuite.output);
     core.info(
       `Check suite status: ${failedSuite.status} (${failedSuite.output.title})`
     );
-    return false
+    return false;
   }
-  return true
+  return true;
 }
 
 async function assignReviewer(octokit, owners, repoDeeets, pr) {
@@ -243,8 +253,8 @@ async function getApprovers(octokit, repoDeets, pr) {
 }
 
 async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
-  core.info(owners)
-  
+  core.info(owners);
+
   const comments = await octokit.issues.listComments({
     ...repoDeeets,
     issue_number: pr.number,
@@ -253,8 +263,11 @@ async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
     (c) =>
       c.body.match(mergeRegex) &&
       c.user.login !== pr.user.login &&
-      owners.includes('@' + c.user.login)
+      owners.includes("@" + c.user.login)
   );
+  if (hasMergeCommand) {
+    core.info(`Found lgtm comment from ${hasMergeCommand.user.login}`);
+  }
 
   const { data: reviewComments } = await octokit.pulls.listReviews({
     ...repoDeeets,
@@ -264,9 +277,10 @@ async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
     (c) =>
       c.body.match(mergeRegex) &&
       c.user.login !== pr.user.login &&
-      owners.includes('@' + c.user.login)
+      owners.includes("@" + c.user.login)
   );
-  if (hasMergeCommandReview) {
+  if (hasMergeCommand) {
+    core.info(`Found lgtm review from ${hasMergeCommandReview.user.login}`);
     hasMergeCommand = true;
   }
   return hasMergeCommand;
@@ -298,9 +312,23 @@ async function canBeMerged(
       codeowners
     );
   });
-  if (changedFilesNotApproved.length > 0) {
-    core.info(`Missing files to be approved: ${changedFilesNotApproved}`);
+
+  const { users: missingOwners } = getCodeOwnersAndLabels(
+    changedFilesNotApproved,
+    codeowners
+  );
+  if (missingOwners.length > 0 && changedFilesNotApproved.length > 0) {
+    core.info(
+      `Missing files to be approved: ${changedFilesNotApproved}. Potential owners: ${Intl.ListFormat().format(
+        missingOwners
+      )}`
+    );
     return false;
+  }
+  if (changedFilesNotApproved.length > 0 && missingOwners.length === 0) {
+    core.info(
+      `Files without explicit ownership: ${changedFilesNotApproved}. Continuing merge since we assume this is okay!`
+    );
   }
   if (!(await isCheckSuiteGreen(octokit, repoDeeets, pr))) {
     core.info("Check suite not green");
@@ -402,7 +430,7 @@ async function run() {
       ...repoDeets,
       issue_number: pr.number,
       body: `Merged with approvals from ${Intl.ListFormat().format(
-        owners
+        approved
       )} - thanks for the contribution! :tada:`,
     });
   } catch (error) {
