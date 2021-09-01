@@ -89,7 +89,7 @@ There are four options available at the moment:
 
 ```yml
 - name: Run Codeowners merge check
-  uses: OSS-Docs-Tools/code-owner-self-merge@v1
+  uses: casassg/auto-merge-bot@v1
   env:
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   with:
