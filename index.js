@@ -306,7 +306,15 @@ async function run() {
       await octokit.issues.createComment({
         ...repoDeets,
         issue_number: pr.number,
-        body: `Approval received from @${context.payload.sender.login}!`,
+        body: `Approval received from @${sender}! :white_check_mark:`,
+      });
+    }
+
+    if (body.match(mergeRegex) && owners.includes(sender) && sender !== pr.user.login) {
+      await octokit.issues.createComment({
+        ...repoDeets,
+        issue_number: pr.number,
+        body: `Merge request from @${sender} received. PR will be automatically merged once it has all necessary approvals! :white_check_mark:`,
       });
     }
   }
