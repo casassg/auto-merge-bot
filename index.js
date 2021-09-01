@@ -84,6 +84,7 @@ async function isCheckSuiteGreen(octokit, repoDeeets, pr) {
     ...repoDeeets,
     ref: `pull/${pr.number}/head`,
   });
+  console.log(checkSuites.data);
   const failedSuite = checkSuites.data.check_suites.find(
     (s) => s.status !== "completed" && !s.app.name.toLowerCase().includes('merging')
   );
