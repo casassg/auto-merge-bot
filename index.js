@@ -40,6 +40,24 @@ function getFilesNotOwnedByCodeOwner(owner, files, codeowners) {
   return filesWhichArentOwned;
 }
 
+async function sendCommentUpdate(
+  octokit,
+  repoDeets,
+  prNumber,
+  comment_base,
+  extra_comment
+) {
+  if (comment_base) {
+    await octokit.issues.createComment({
+      ...repoDeets,
+      issue_number: prNumber,
+      body: `${comment_base}
+
+${extra_comment}`,
+    });
+  }
+}
+
 function isCommentValid(
   body,
   author,
@@ -371,6 +389,7 @@ async function run() {
     changedFiles,
     codeowners
   );
+  let commentMessage = "";
   if (context.eventName === "pull_request_target") {
     if (await hasPRWelcomeMessage(octokit, repoDeets, pr.number)) {
       core.info(`PR already welcomed`);
@@ -390,7 +409,7 @@ Approve using \`/lgtm\` and mark for automatic merge by using \`/merge\`.`;
   } else {
     const body = getPayloadBody();
     const sender = context.payload.sender.login;
-    const isApproval = isCommentValid(
+    const isApprovalComment = isCommentValid(
       body,
       sender,
       lgtmRegex,
@@ -398,25 +417,13 @@ Approve using \`/lgtm\` and mark for automatic merge by using \`/merge\`.`;
       pr,
       context.payload.state === "APPROVED"
     );
-    const isMerge = isCommentValid(body, sender, mergeRegex, owners, pr);
-    if (isApproval && isMerge) {
-      await octokit.issues.createComment({
-        ...repoDeets,
-        issue_number: pr.number,
-        body: `Approval and merge request received from @${sender}! :white_check_mark:`,
-      });
-    } else if (isApproval) {
-      await octokit.issues.createComment({
-        ...repoDeets,
-        issue_number: pr.number,
-        body: `Approval received from @${sender}! :white_check_mark:`,
-      });
-    } else if (isMerge) {
-      await octokit.issues.createComment({
-        ...repoDeets,
-        issue_number: pr.number,
-        body: `Merge request received from @${sender}! :white_check_mark:`,
-      });
+    const isMergeComment = isCommentValid(body, sender, mergeRegex, owners, pr);
+    if (isApprovalComment && isMergeComment) {
+      commentMessage = `Approval and merge request received from @${sender}! :white_check_mark:`;
+    } else if (isApprovalComment) {
+      commentMessage = `Approval received from @${sender}! :white_check_mark:`;
+    } else if (isMergeComment) {
+      commentMessage = `Merge request received from @${sender}! :white_check_mark:`;
     }
   }
   for (const label of labels) {
@@ -476,6 +483,13 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
     labelConfigs.push(needsLgtmLabel);
     core.setFailed(`PR cannot be merged`);
     await setLabels(octokit, repoDeets, labelConfigs, pr.number);
+    await sendCommentUpdate(
+      octokit,
+      repoDeets,
+      pr.number,
+      commentMessage,
+      "PR is missing approvals for some files still."
+    );
     process.exit(1);
   }
   labelConfigs.push(lgtmLabel);
@@ -486,6 +500,13 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
         approverOwners
       )}`
     );
+    await sendCommentUpdate(
+      octokit,
+      repoDeets,
+      pr.number,
+      commentMessage,
+      "PR is approved. Missing merge command to auto-merge PR!"
+    );
     await setLabels(octokit, repoDeets, labelConfigs, pr.number);
     process.exit(1);
   }
@@ -493,6 +514,13 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
   await setLabels(octokit, repoDeets, labelConfigs, pr.number);
   if (!(await isCheckSuiteGreen(octokit, repoDeets, pr))) {
     core.info("Check suite not green");
+    await sendCommentUpdate(
+      octokit,
+      repoDeets,
+      pr.number,
+      commentMessage,
+      "PR will be auto-merged once Test suite is green!"
+    );
     process.exit(1);
   }
 
