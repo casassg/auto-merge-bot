@@ -1,10 +1,30 @@
-A GitHub action that lets code-owners merge PRs via a comment.
+# auto-merge-bot
+
+A GitHub action to manage pull requests automatically via comments from CODEOWNERS.
+
+Heavily inpired by functionality from [prow-bot](https://github.com/kubernetes/test-infra/tree/master/prow) and based on the exiting GitHub action 
+[OSS-Docs-Tools/code-owner-self-merge](https://github.com/OSS-Docs-Tools/code-owner-self-merge).
+
+## Code ownership
 
 This action uses the standardized structure of [a CODEOWNERS file](https://github.blog/2017-07-06-introducing-code-owners/) to handle the access controls. 
 
-This repository is forked from [OSS-Docs-Tools/code-owner-self-merge](https://github.com/OSS-Docs-Tools/code-owner-self-merge). 
+In addition, it will try to assign the pull request to a person to review based on their current load of assigned reviews in the repo.
 
-Main difference is that it adds less comments to PRs and it also allows for multiple code owners to approve a PR for it to be merged.
+## Commands available
+
+- `/lgtm`: Approve a pull request. Code owners can use this to approve the pull request. If no code owner can be found other than author, any user can then approve the pull request.
+- `/merge`: Request automatic merging of a pull request. Code owners can use this to request automatic merging of the pull request. If no code owner can be found other than author, any user can then request automatic merging of the pull request.
+
+## When is a PR merged?
+
+`auto-merge-bot` will validate the following:
+
+- Pull request has been approved by a code owner for each of the changed files.
+- Pull request has been requested to be automatically merged
+- All checks are green in PR.
+
+After this has been done, PR will be merged automatically.
 
 ## A simple example
 
@@ -13,6 +33,10 @@ So, with this file at: `.github/CODEOWNERS`:
 ```sh
 README.md @casassg
 ```
+
+The GitHub action will automatically merge pull requests approved that are made by the user `@casassg` to the file `README.md` and have been approved. 
+
+If another user tries to modify the file, `@casassg` will be tagged for review. Once user reviews and approves the change, the PR will be merged.
 
 ## Setting It Up
 
@@ -24,16 +48,15 @@ on:
   pull_request_target: { types: [opened, synchronize] }
   issue_comment: { types: [created] }
   pull_request_review: { types: [submitted] }
-  check_suite: {types: [completed]}
 
 jobs:
-  build:
+  auto-merge-bot:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v1
       - name: Run Codeowners merge check
-        uses: casassg/code-owner-self-merge@master
+        uses: casassg/auto-merge-bot@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -42,7 +65,8 @@ Then you should be good to go.
 
 ### Security
 
-We force the use of [`pull_request_target`](https://github.blog/2020-08-03-github-actions-improvements-for-fork-and-pull-request-workflows/) as a workflow event to ensure that someone cannot change the CODEOWNER files at the same time as having that change be used to validate if they can merge.
+Use [`pull_request_target`](https://github.blog/2020-08-03-github-actions-improvements-for-fork-and-pull-request-workflows/) as a workflow event to ensure that someone cannot change the CODEOWNER files at the same time as having that change be used to validate if they can merge.
+
 ### Extras
 
 You can use this label to set labels for specific sections of the codebase, by having square brackets to indicate labels to make: `[label]`
@@ -61,7 +85,7 @@ packages/documentation/copy/es/**/*.ts @KingDarBoja [translate] [es]
 There are four options available at the moment:
 
 - `cwd`, which can be used to determine the root folder to look for CODEOWNER files in.
-- `merge_method`, which can be `merge` (default), `squash` or `rebase`, depending on what you want the action to do.
+- `merge_method`, which can be `merge`, `squash` (default) or `rebase`, depending on what you want the action to do.
 
 ```yml
 - name: Run Codeowners merge check
@@ -74,6 +98,8 @@ There are four options available at the moment:
 ```
 
 ### Dev
+
+ToDo(casassg): add tests back.
 
 <!-- Use `npx jest --watch` to run tests. -->
 
