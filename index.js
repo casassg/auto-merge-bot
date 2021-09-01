@@ -90,10 +90,13 @@ async function isCheckSuiteGreen(octokit, repoDeeets, pr) {
       (s.status === "in_progress" ||
         (s.status === "completed" && s.conclusion === "failure")) && !(s.id !== parseInt(process.env.GITHUB_RUN_ID))
   );
-  console.log(failedSuite.app);
-  core.info(
-    `Check suite status: ${failedSuite.status} (${failedSuite.app})`
-  );
+  console.log(process.env.GITHUB_RUN_ID);
+  if (failedSuite){
+    console.log(failedSuite.app);
+    core.info(
+      `Check suite status: ${failedSuite.status} (${failedSuite.app})`
+    );
+  }
   return failedSuite !== undefined;
 }
 
