@@ -79,10 +79,12 @@ async function addLabel(octokit, repoDeets, labelConfig, prNumber) {
   });
 }
 
-async function isCheckSuiteGreen(octokit, repoDeeets, prNumber) {
+async function isCheckSuiteGreen(octokit, repoDeeets, pr) {
+  
+  
   const checkSuites = await octokit.checks.listSuitesForRef({
     ...repoDeeets,
-    ref: `pull/${prNumber}/head`,
+    ref: `pull/${pr.number}/head`,
   });
   const checkSuite = checkSuites.data.check_suites.find(
     (s) => s.app.slug == "github-actions"
