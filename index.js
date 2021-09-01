@@ -350,6 +350,8 @@ Seems ${pr.user.login} is only owner for changes. Any user can use \`/merge\` or
   await addLabel(octokit, repoDeeets, labelConfig, pr.number);
   if (!(await hasMergeCommand(octokit, repoDeeets, pr, approverOwners))) {
     core.info(`Missing /merge command by an owner: ${approverOwners}`);
+    const labelConfig = {name: "no-merge", color: "808080"};
+    await addLabel(octokit, repoDeeets, labelConfig, pr.number);
     return false;
   }
   if (!(await isCheckSuiteGreen(octokit, repoDeeets, pr))) {
