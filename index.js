@@ -46,7 +46,7 @@ function getCodeOwnersAndLabels(changedFiles, codeowners) {
       if (o.startsWith("[")) labels.add(o.slice(1, o.length - 1));
     });
   }
-  core.info(`Found ${owners} owners and ${labels}`);
+  core.info(`Found ${ListFormat().format(owners)} owners and ${ListFormat().format(labels)}`);
   return {
     users: Array.from(owners),
     labels: Array.from(labels),
@@ -375,7 +375,7 @@ async function run() {
   const pr = context.payload.pull_request || context.payload.issue;
   const repoDeets = { owner: context.repo.owner, repo: context.repo.repo };
   const changedFiles = await getChangedFiles(octokit, repoDeets, pr.number);
-
+  core.info(`Changed files: ${new Intl.ListFormat().format(changedFiles)}`);
   const { users: owners, labels: labels } = await getCodeOwnersAndLabels(
     changedFiles,
     codeowners
