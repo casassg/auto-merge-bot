@@ -280,6 +280,7 @@ async function run() {
   const pr = context.payload.pull_request;
   const repoDeets = { owner: context.repo.owner, repo: context.repo.repo };
   const changedFiles = await getChangedFiles(octokit, repoDeets, pr.number);
+  
   const { users: owners, labels: labels } = await getCodeOwnersAndLabels(
     changedFiles,
     codeowners
@@ -299,7 +300,9 @@ async function run() {
     }
   } else {
     const body = getPayloadBody();
-    if (body.match(lgtmRegex)) {
+    const sender = context.payload.sender.login;
+
+    if (body.match(lgtmRegex) && owners.includes(sender) && sender !== pr.user.login) {
       await octokit.issues.createComment({
         ...repoDeets,
         issue_number: pr.number,
