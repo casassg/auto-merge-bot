@@ -290,13 +290,15 @@ async function canBeMerged(
     core.info(
       "Seems PR user is only owner. Will accept anyone to merge or approve."
     );
+    // Wait a few secons to make sure first comment is published.
+    await new Promise((resolve) => setTimeout(resolve, 5000));
     await welcomeMessage(
       octokit,
       repoDeeets,
       pr.number,
       `Thanks for the PR! 🚀
 
-Seems ${pr.user.login} is only owner for changes. Any user can use \`/merge\` or \`/lgtm\` to merge or approve.`
+Seems you are only owner for changes on this PR. Any user can use \`/merge\` or \`/lgtm\` to merge or approve.`
     );
   }
   const approvers = await getApprovers(octokit, repoDeeets, pr, approverOwners);
