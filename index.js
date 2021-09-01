@@ -86,7 +86,7 @@ async function isCheckSuiteGreen(octokit, repoDeeets, pr) {
   });
   console.log(checkSuites.data);
   const failedSuite = checkSuites.data.check_suites.find(
-    (s) => s.status !== "completed" && !s.app.name.toLowerCase().includes('merging')
+    (s) => (s.status === "in_progress" || (s.status === 'completed' && s.conclusion === 'failure')) && !s.app.name.toLowerCase().includes('merging')
   );
   core.info(
     `Check suite status: ${failedSuite.status} (${failedSuite.app.name})`
