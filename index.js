@@ -292,7 +292,7 @@ async function run() {
         octokit,
         owners,
         repoDeets,
-        pr.number
+        pr
       );
       core.info(`Assigned reviewer: ${assignee}. Sending welcome message!`);
       await welcomeMessage(octokit, repoDeets, pr.number, assignee);
