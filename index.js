@@ -80,15 +80,15 @@ async function addLabel(octokit, repoDeets, labelConfig, prNumber) {
 }
 
 async function isCheckSuiteGreen(octokit, repoDeeets, pr) {
-  const checkSuites = await octokit.checks.listSuitesForRef({
+  const checkSuites = await octokit.checks.listForRef({
     ...repoDeeets,
     ref: `pull/${pr.number}/head`,
   });
   console.log(checkSuites.data);
-  const failedSuite = checkSuites.data.check_suites.find(
+  const failedSuite = checkSuites.data.check_runs.find(
     (s) =>
       (s.status === "in_progress" ||
-        (s.status === "completed" && s.conclusion === "failure")) && (s.output.title !== process.env.GITHUB_JOB)
+        (s.status === "completed" && s.conclusion === "failure")) && (s.name !== process.env.GITHUB_JOB)
   );
   console.log(process.env.GITHUB_ACTION);
   console.log(process.env.GITHUB_JOB);
