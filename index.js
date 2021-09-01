@@ -172,29 +172,29 @@ async function assignReviewer(octokit, owners, repoDeeets, pr) {
   return assignee;
 }
 
-async function welcomeMessage(octokit, repoDeets, prNumber, assignee) {
-  let message = "";
-  if (assignee) {
-    message = `Thanks for the PR! :rocket:
-
-Owners will be reviewing this PR. Assigned reviewer: ${assignee}
+async function welcomeMessage(octokit, repoDeets, prNumber, message) {
+  message = message + ourSignature;
   
-Approve using \`/lgtm\` and mark for automatic merge by using \`/merge\`.
-  ${ourSignature}`;
+  const comment = await hasPRWelcomeMessage(octokit, repoDeets, prNumber);
+  if (comment) {
+    if (comment.body.includes(message)) {
+      core.info("PR Welcome message already exists");
+      return;
+    }
+    await octokit.issues.updateComment({
+      ...repoDeets,
+      comment_id: comment.id,
+      body: message,
+    });
   } else {
-    message = `Thanks for the PR! :rocket:
-
-Owners will be reviewing this PR. No automatic reviewer could be found.
-  
-Approve using \`/lgtm\` and mark for automatic merge by using \`/merge\`.
-  ${ourSignature}`;
+    octokit.issues.createComment({
+      ...repoDeets,
+      issue_number: prNumber,
+      body: message,
+    });
   }
 
-  octokit.issues.createComment({
-    ...repoDeets,
-    issue_number: prNumber,
-    body: message,
-  });
+  
 }
 
 async function hasPRWelcomeMessage(octokit, repoDeeets, prNumber) {
@@ -274,23 +274,6 @@ async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
   return hasMergeCommand;
 }
 
-async function updateWelcomeComment(octokit, repoDeets, prNumber, message) {
-  const welcomeComment = await hasPRWelcomeMessage(
-    octokit,
-    repoDeets,
-    prNumber
-  );
-  message = message + ourSignature
-  if (welcomeComment && welcomeComment.body !== message) {
-    core.info(`Welcome comment update to: ${message}`);
-    octokit.issues.updateComment({
-      ...repoDeets,
-      comment_id: welcomeComment.id,
-      body: message,
-    });
-  }
-}
-
 async function canBeMerged(
   octokit,
   repoDeeets,
@@ -305,7 +288,7 @@ async function canBeMerged(
     core.info(
       "Seems PR user is only owner. Will accept anyone to merge or approve."
     );
-    await updateWelcomeComment(
+    await welcomeMessage(
       octokit,
       repoDeeets,
       pr.number,
@@ -399,7 +382,19 @@ async function run() {
     } else {
       const assignee = await assignReviewer(octokit, owners, repoDeets, pr);
       core.info(`Assigned reviewer: ${assignee}. Sending welcome message!`);
-      await welcomeMessage(octokit, repoDeets, pr.number, assignee);
+      let message = ""
+      if (assignee) {
+        message = `Thanks for the PR! :rocket:
+    
+Owners will be reviewing this PR. Assigned reviewer: ${assignee}
+  
+Approve using \`/lgtm\` and mark for automatic merge by using \`/merge\`.`;
+      } else {
+        message = `Thanks for the PR! :rocket:
+    
+Owners will be reviewing this PR. No automatic reviewer could be found.`;
+      }
+      await welcomeMessage(octokit, repoDeets, pr.number, message);
     }
   } else {
     const body = getPayloadBody();
@@ -407,7 +402,7 @@ async function run() {
 
     if (
       body.match(lgtmRegex) &&
-      owners.includes(sender) &&
+      (owners.length ===0 || owners.includes(sender)) &&
       sender !== pr.user.login
     ) {
       await octokit.issues.createComment({
@@ -419,7 +414,7 @@ async function run() {
 
     if (
       body.match(mergeRegex) &&
-      owners.includes(sender) &&
+      (owners.length ===0 || owners.includes(sender)) &&
       sender !== pr.user.login
     ) {
       await octokit.issues.createComment({
@@ -441,13 +436,11 @@ async function run() {
     core.info(
       "No owners for changes found. No automatic merge is possible. Consider adding root owners!"
     );
-    await updateWelcomeComment(
+    await welcomeMessage(
       octokit,
       repoDeets,
       pr.number,
-      `Thanks for the PR! 🚀
-
-No owners for changes found. No automatic merge is possible.`
+      `No owners for changes found. No automatic merge is possible.`
     );
     process.exit(0);
   }
