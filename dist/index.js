@@ -488,9 +488,9 @@ Owners will be reviewing this PR. No automatic reviewer could be found.`;
     process.exit(1);
   }
   labelConfigs.push(mergeReadyLabel);
+  await setLabels(octokit, repoDeets, labelConfigs, pr.number);
   if (!(await isCheckSuiteGreen(octokit, repoDeets, pr))) {
     core.info("Check suite not green");
-    await setLabels(octokit, repoDeets, labelConfigs, pr.number);
     process.exit(1);
   }
 
