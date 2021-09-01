@@ -88,9 +88,9 @@ async function isCheckSuiteGreen(octokit, repoDeeets, pr) {
   const failedSuite = checkSuites.data.check_suites.find(
     (s) =>
       (s.status === "in_progress" ||
-        (s.status === "completed" && s.conclusion === "failure")) && !(s.id !== parseInt(process.env.GITHUB_RUN_ID))
+        (s.status === "completed" && s.conclusion === "failure")) && !(s.id !== parseInt(process.env.GITHUB_JOB))
   );
-  console.log(process.env.GITHUB_RUN_ID);
+  console.log(process.env.GITHUB_JOB);
   if (failedSuite){
     console.log(failedSuite.app);
     core.info(
