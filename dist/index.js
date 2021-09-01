@@ -208,7 +208,15 @@ async function assignReviewer(octokit, owners, repoDeeets, pr) {
 async function welcomeMessage(octokit, repoDeets, prNumber, message) {
   const comment = await hasPRWelcomeMessage(octokit, repoDeets, prNumber);
   if (comment) {
-    if (comment.body.toLowerCase().replace(" ", "").replace("\n", "").includes(message.toLowerCase().replace(" ", "").replace("\n", ""))) {
+    console.log(comment.body)
+    console.log(message)
+    if (
+      comment.body
+        .toLowerCase()
+        .replace(" ", "")
+        .replace("\n", "")
+        .includes(message.toLowerCase().replace(" ", "").replace("\n", ""))
+    ) {
       core.info("PR Welcome message already exists");
       return;
     }

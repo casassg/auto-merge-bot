@@ -201,6 +201,8 @@ async function assignReviewer(octokit, owners, repoDeeets, pr) {
 async function welcomeMessage(octokit, repoDeets, prNumber, message) {
   const comment = await hasPRWelcomeMessage(octokit, repoDeets, prNumber);
   if (comment) {
+    console.log(comment.body)
+    console.log(message)
     if (
       comment.body
         .toLowerCase()
