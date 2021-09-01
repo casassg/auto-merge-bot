@@ -311,10 +311,7 @@ Seems ${pr.user.login} is only owner for changes. Any user can use \`/merge\` or
     await addLabel(octokit, repoDeeets, labelConfig, pr.number);
     return false;
   }
-  if (!(await hasMergeCommand(octokit, repoDeeets, pr, approverOwners))) {
-    core.info(`Missing /merge command by an owner: ${approverOwners}`);
-    return false;
-  }
+
 
   approvers.forEach((approver) => {
     changedFilesNotApproved = getFilesNotOwnedByCodeOwner(
@@ -351,6 +348,10 @@ Seems ${pr.user.login} is only owner for changes. Any user can use \`/merge\` or
   }
   const labelConfig = {name: "lgtm", color: "00FFFF"};
   await addLabel(octokit, repoDeeets, labelConfig, pr.number);
+  if (!(await hasMergeCommand(octokit, repoDeeets, pr, approverOwners))) {
+    core.info(`Missing /merge command by an owner: ${approverOwners}`);
+    return false;
+  }
   if (!(await isCheckSuiteGreen(octokit, repoDeeets, pr))) {
     core.info("Check suite not green");
     return false;
