@@ -118,20 +118,6 @@ async function isCheckSuiteGreen(octokit, repoDeeets, pr) {
     }
   }
   return true;
-
-  console.log(process.env.GITHUB_ACTION);
-  console.log(process.env.GITHUB_JOB);
-  console.log(process.env.GITHUB_RUN_NUMBER);
-  console.log(process.env.GITHUB_WORKFLOW);
-  console.log(process.env.GITHUB_RUN_ID);
-  if (failedSuite) {
-    console.log(failedSuite.output);
-    core.info(
-      `Check suite status: ${failedSuite.status} (${failedSuite.output.title})`
-    );
-    return false;
-  }
-  return true;
 }
 
 async function assignReviewer(octokit, owners, repoDeeets, pr) {
@@ -253,8 +239,6 @@ async function getApprovers(octokit, repoDeets, pr) {
 }
 
 async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
-  core.info(owners);
-
   const comments = await octokit.issues.listComments({
     ...repoDeeets,
     issue_number: pr.number,
