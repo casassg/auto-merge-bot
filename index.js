@@ -80,19 +80,40 @@ async function addLabel(octokit, repoDeets, labelConfig, prNumber) {
 }
 
 async function isCheckSuiteGreen(octokit, repoDeeets, pr) {
-  const checkSuites = await octokit.checks.listForRef({
-    ...repoDeeets,
-    ref: `pull/${pr.number}/head`,
-  });
-  console.log(checkSuites.data);
-  const failedSuite = checkSuites.data.check_runs.find(
-    (s) =>
-      (s.status === "in_progress" ||
-        (s.status === "completed" && s.conclusion === "failure")) && (s.name !== process.env.GITHUB_JOB)
-  );
+  let waitForCompletion =  true;
+  let inprogressRun = null;
+  let failedRun = null;
+  while (waitForCompletion) {
+    let checkSuites = await octokit.checks.listForRef({
+      ...repoDeeets,
+      ref: `pull/${pr.number}/head`,
+    });
+    // Check if there's a run in progress or failed
+    inprogressRun = checkSuites.data.check_runs.find( (s) => s.status === "in_progress" && s.name !== process.env.GITHUB_JOB);
+    failedRun = checkSuites.data.check_runs.find( (s) => s.status === "completed" && s.conclusion === "failure" && s.name !== process.env.GITHUB_JOB);
+    // if failed, returne false
+    if (failedRun){
+      core.info( `Check suite status: ${failedRun.status} (${failedRun.output.title})`)
+      return false;
+    }
+    // if no in progress, then we are good to go!
+    if (!inprogressRun) {
+      waitForCompletion = false;
+    }
+    // Wait for a bit before checking again.
+    else {
+      core.info( `Check suite status: ${inprogressRun.status} (${inprogressRun.output.title})`)
+      core.info('Sleeping for 5000 ms')
+      await new Promise(r => setTimeout(r, 5000));
+    }
+    
+  }
+  return true;
+  
   console.log(process.env.GITHUB_ACTION);
   console.log(process.env.GITHUB_JOB);
   console.log(process.env.GITHUB_RUN_NUMBER);
+  console.log(process.env.GITHUB_WORKFLOW);
   console.log(process.env.GITHUB_RUN_ID);
   if (failedSuite){
     console.log(failedSuite.output);
