@@ -80,17 +80,17 @@ async function addLabel(octokit, repoDeets, labelConfig, prNumber) {
 }
 
 async function isCheckSuiteGreen(octokit, repoDeeets, pr) {
-  
-  
   const checkSuites = await octokit.checks.listSuitesForRef({
     ...repoDeeets,
     ref: `pull/${pr.number}/head`,
   });
-  const checkSuite = checkSuites.data.check_suites.find(
-    (s) => s.app.slug == "github-actions"
+  const failedSuite = checkSuites.data.check_suites.find(
+    (s) => s.status !== "completed" && !s.app.name.toLowerCase().includes('merging')
   );
-  core.info(`Check suite status: ${checkSuite.status} && ${checkSuite.conclusion}`);
-  return checkSuite.status == "completed" && checkSuite.conclusion == "success";
+  core.info(
+    `Check suite status: ${failedSuite.status} (${failedSuite.app.name})`
+  );
+  return failedSuite !== undefined;
 }
 
 async function assignReviewer(octokit, owners, repoDeeets, pr) {
