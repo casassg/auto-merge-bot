@@ -5,7 +5,8 @@
   "license": "MIT",
   "scripts": {
     "test": "npx jest",
-    "dist": "ncc build index.js --license licenses.txt"
+    "dist": "ncc build index.js --license licenses.txt",
+    "format": "npx prettier --write '*.js'"
   },
   "dependencies": {
     "@actions/core": "^1.2.4",
@@ -15,6 +16,7 @@
     "codeowners": "^4.2.0"
   },
   "devDependencies": {
-    "@vercel/ncc": "^0.30.0"
+    "@vercel/ncc": "^0.30.0",
+    "prettier": "^2.3.2"
   }
 }

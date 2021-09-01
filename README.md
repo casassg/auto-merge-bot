@@ -2,12 +2,12 @@
 
 A GitHub action to manage pull requests automatically via comments from CODEOWNERS.
 
-Heavily inpired by functionality from [prow-bot](https://github.com/kubernetes/test-infra/tree/master/prow) and based on the exiting GitHub action 
+Heavily inpired by functionality from [prow-bot](https://github.com/kubernetes/test-infra/tree/master/prow) and based on the exiting GitHub action
 [OSS-Docs-Tools/code-owner-self-merge](https://github.com/OSS-Docs-Tools/code-owner-self-merge).
 
 ## Code ownership
 
-This action uses the standardized structure of [a CODEOWNERS file](https://github.blog/2017-07-06-introducing-code-owners/) to handle the access controls. 
+This action uses the standardized structure of [a CODEOWNERS file](https://github.blog/2017-07-06-introducing-code-owners/) to handle the access controls.
 
 In addition, it will try to assign the pull request to a person to review based on their current load of assigned reviews in the repo.
 
@@ -34,7 +34,7 @@ So, with this file at: `.github/CODEOWNERS`:
 README.md @casassg
 ```
 
-The GitHub action will automatically merge pull requests approved that are made by the user `@casassg` to the file `README.md` and have been approved. 
+The GitHub action will automatically merge pull requests approved that are made by the user `@casassg` to the file `README.md` and have been approved.
 
 If another user tries to modify the file, `@casassg` will be tagged for review. Once user reviews and approves the change, the PR will be merged.
 
@@ -93,8 +93,8 @@ There are four options available at the moment:
   env:
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   with:
-    cwd: './docs'
-    merge_method: 'squash'
+    cwd: "./docs"
+    merge_method: "squash"
 ```
 
 ### Dev

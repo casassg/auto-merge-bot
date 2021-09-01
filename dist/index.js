@@ -41,6 +41,22 @@ function getFilesNotOwnedByCodeOwner(owner, files, codeowners) {
   return filesWhichArentOwned;
 }
 
+function isCommentValid(
+  body,
+  author,
+  regex,
+  owners,
+  pr,
+  extra_validation = false
+) {
+  return (
+    !body.includes(ourSignature) &&
+    (body.match(regex) || extra_validation) &&
+    (owners.length === 0 || owners.includes("@" + author)) &&
+    author !== pr.user.login
+  );
+}
+
 function getCodeOwnersAndLabels(changedFiles, codeowners) {
   const owners = new Set();
   const labels = new Set();
@@ -53,7 +69,11 @@ function getCodeOwnersAndLabels(changedFiles, codeowners) {
       if (o.startsWith("[")) labels.add(o.slice(1, o.length - 1));
     });
   }
-  core.info(`Found ${new Intl.ListFormat().format(owners)} owners and ${new Intl.ListFormat().format(labels)} labels`);
+  core.info(
+    `Found ${new Intl.ListFormat().format(
+      owners
+    )} owners and ${new Intl.ListFormat().format(labels)} labels`
+  );
   return {
     users: Array.from(owners),
     labels: Array.from(labels),
@@ -181,7 +201,7 @@ async function assignReviewer(octokit, owners, repoDeeets, pr) {
 
 async function welcomeMessage(octokit, repoDeets, prNumber, message) {
   message = message + ourSignature;
-  
+
   const comment = await hasPRWelcomeMessage(octokit, repoDeets, prNumber);
   if (comment) {
     if (comment.body.includes(message)) {
@@ -200,8 +220,6 @@ async function welcomeMessage(octokit, repoDeets, prNumber, message) {
       body: message,
     });
   }
-
-  
 }
 
 async function hasPRWelcomeMessage(octokit, repoDeeets, prNumber) {
@@ -221,11 +239,7 @@ async function getApprovers(octokit, repoDeets, pr, owners) {
   let users = [];
   comments.forEach((comment) => {
     if (
-      !comment.body.includes(ourSignature) &&
-      comment.body.match(lgtmRegex) &&
-      (owners === 0 || owners.includes("@" + comment.user.login)) &&
-      comment.user.login !== pr.user.login &&
-      !comment.body.includes(ourSignature)
+      isCommentValid(comment.body, comment.user.login, lgtmRegex, owners, pr)
     ) {
       core.info(`Found lgtm comment from ${comment.user.login}`);
       users.push(comment.user.login);
@@ -237,13 +251,18 @@ async function getApprovers(octokit, repoDeets, pr, owners) {
   });
   reviewComments.forEach((comment) => {
     if (
-      (comment.state === "APPROVED" || comment.body.match(lgtmRegex)) &&
-      (owners === 0 || owners.includes("@" + comment.user.login)) &&
-      comment.user.login !== pr.user.login &&
-      !comment.body.includes(ourSignature)
-    )
+      isCommentValid(
+        comment.body,
+        comment.user.login,
+        lgtmRegex,
+        owners,
+        pr,
+        comment.state === "APPROVED"
+      )
+    ) {
       core.info(`Found lgtm comment from ${comment.user.login}`);
-    users.push(comment.user.login);
+      users.push(comment.user.login);
+    }
   });
   return users;
 }
@@ -253,12 +272,8 @@ async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
     ...repoDeeets,
     issue_number: pr.number,
   });
-  let hasMergeCommand = comments.data.find(
-    (c) =>
-      !c.body.includes(ourSignature) &&
-      c.body.match(mergeRegex) &&
-      (owners.length === 0 || owners.includes("@" + c.user.login)) &&
-      c.user.login !== pr.user.login
+  let hasMergeCommand = comments.data.find((c) =>
+    isCommentValid(c.body, c.user.login, mergeRegex, owners, pr)
   );
   if (hasMergeCommand) {
     core.info(`Found merge comment from ${hasMergeCommand.user.login}`);
@@ -270,11 +285,8 @@ async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
     ...repoDeeets,
     pull_number: pr.number,
   });
-  const hasMergeCommandReview = reviewComments.find(
-    (c) =>
-      c.body.match(mergeRegex) &&
-      (owners.length === 0 || owners.includes("@" + c.user.login)) &&
-      c.user.login !== pr.user.login
+  const hasMergeCommandReview = reviewComments.find((c) =>
+    isCommentValid(c.body, c.user.login, mergeRegex, owners, pr)
   );
   if (hasMergeCommandReview) {
     core.info(`Found merge review from ${hasMergeCommandReview.user.login}`);
@@ -393,7 +405,7 @@ async function run() {
     } else {
       const assignee = await assignReviewer(octokit, owners, repoDeets, pr);
       core.info(`Assigned reviewer: ${assignee}. Sending welcome message!`);
-      let message = ""
+      let message = "";
       if (assignee) {
         message = `Thanks for the PR! :rocket:
     
@@ -410,30 +422,32 @@ Owners will be reviewing this PR. No automatic reviewer could be found.`;
   } else {
     const body = getPayloadBody();
     const sender = context.payload.sender.login;
-
-    if (
-      body.match(lgtmRegex) &&
-      (owners.length ===0 || owners.includes(sender)) &&
-      !body.includes(ourSignature) &&
-      sender !== pr.user.login
-    ) {
+    const isApproval = isCommentValid(
+      body,
+      sender,
+      lgtmRegex,
+      owners,
+      pr,
+      context.payload.state === "APPROVED"
+    );
+    const isMerge = isCommentValid(body, sender, mergeRegex, owners, pr);
+    if (isApproval && isMerge) {
+      await octokit.issues.createComment({
+        ...repoDeets,
+        issue_number: pr.number,
+        body: `Approval and merge request received from @${sender}! :white_check_mark:`,
+      });
+    } else if (isApproval) {
       await octokit.issues.createComment({
         ...repoDeets,
         issue_number: pr.number,
         body: `Approval received from @${sender}! :white_check_mark:`,
       });
-    }
-
-    if (
-      body.match(mergeRegex) &&
-      (owners.length ===0 || owners.includes(sender)) &&
-      !body.includes(ourSignature) &&
-      sender !== pr.user.login
-    ) {
+    } else if (isMerge) {
       await octokit.issues.createComment({
         ...repoDeets,
         issue_number: pr.number,
-        body: `Merge request from @${sender} received. PR will be automatically merged once it has all necessary approvals! :white_check_mark:`,
+        body: `Merge request received from @${sender}! :white_check_mark:`,
       });
     }
   }
