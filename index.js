@@ -115,7 +115,8 @@ async function assignReviewer(octokit, owners, repoDeeets, pr) {
   owners.sort(() => Math.random() - 0.5);
 
   // remove pr owner from list
-  owners = owners.filter((o) => o !== pr.user.login);
+  owners = owners.filter((o) => o !== '@'+pr.user.login);
+  core.info(`Elegible reviewers: ${owners}`)
 
   // Randomly get a user to assign to this PR with the minimum number of PRs assigned to them
   let assignee = '';
