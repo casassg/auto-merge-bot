@@ -208,15 +208,9 @@ async function assignReviewer(octokit, owners, repoDeeets, pr) {
 async function welcomeMessage(octokit, repoDeets, prNumber, message) {
   const comment = await hasPRWelcomeMessage(octokit, repoDeets, prNumber);
   if (comment) {
-    console.log(comment.body)
-    console.log(message)
-    if (
-      comment.body
-        .toLowerCase()
-        .replace(" ", "")
-        .replace("\n", "")
-        .includes(message.toLowerCase().replace(" ", "").replace("\n", ""))
-    ) {
+    console.log(comment.body);
+    console.log(message);
+    if (comment.body.includes(message)) {
       core.info("PR Welcome message already exists");
       return;
     }
@@ -469,7 +463,7 @@ Owners will be reviewing this PR. No automatic reviewer could be found.`;
       octokit,
       repoDeets,
       pr.number,
-      `Thanks for the PR! 🚀
+      `Thanks for the PR! :rocket:
 
 Seems you are only owner for changes on this PR. Any user can use \`/merge\` or \`/lgtm\` to merge or approve.`
     );
@@ -478,7 +472,7 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
       octokit,
       repoDeets,
       pr.number,
-      `Thanks for the PR! 🚀
+      `Thanks for the PR!  :rocket:
 
 Owners will be reviewing this PR.`
     );
