@@ -54,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v0.1
       - name: Run Codeowners merge check
         uses: casassg/auto-merge-bot@master
         env:
@@ -89,7 +89,7 @@ There are four options available at the moment:
 
 ```yml
 - name: Run Codeowners merge check
-  uses: casassg/auto-merge-bot@v1
+  uses: casassg/auto-merge-bot@v0.1
   env:
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   with:
