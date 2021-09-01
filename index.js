@@ -319,7 +319,7 @@ async function canBeMerged(
   );
   if (missingOwners.length > 0 && changedFilesNotApproved.length > 0) {
     core.info(
-      `Missing files to be approved: ${changedFilesNotApproved}. Potential owners: ${Intl.ListFormat().format(
+      `Missing files to be approved: ${changedFilesNotApproved}. Potential owners: ${new Intl.ListFormat().format(
         missingOwners
       )}`
     );
@@ -429,7 +429,7 @@ async function run() {
     await octokit.issues.createComment({
       ...repoDeets,
       issue_number: pr.number,
-      body: `Merged with approvals from ${Intl.ListFormat().format(
+      body: `Merged with approvals from ${new Intl.ListFormat().format(
         approved
       )} - thanks for the contribution! :tada:`,
     });
