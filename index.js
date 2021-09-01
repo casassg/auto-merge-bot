@@ -249,12 +249,11 @@ async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
     ...repoDeeets,
     issue_number: pr.number,
   });
-  core.info(JSON.stringify(comments.data))
   let hasMergeCommand = comments.data.find(
     (c) =>
       c.body.match(mergeRegex) &&
       c.user.login !== pr.user.login &&
-      owners.includes(c.user.login)
+      owners.includes('@' + c.user.login)
   );
 
   const { data: reviewComments } = await octokit.pulls.listReviews({
@@ -265,7 +264,7 @@ async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
     (c) =>
       c.body.match(mergeRegex) &&
       c.user.login !== pr.user.login &&
-      c.user.login in owners
+      owners.includes('@' + c.user.login)
   );
   if (hasMergeCommandReview) {
     hasMergeCommand = true;
