@@ -87,6 +87,7 @@ async function isCheckSuiteGreen(octokit, repoDeeets, prNumber) {
   const checkSuite = checkSuites.data.check_suites.find(
     (s) => s.app.slug == "github-actions"
   );
+  core.info(`Check suite status: ${checkSuite.status} && ${checkSuite.conclusion}`);
   return checkSuite.status == "completed" && checkSuite.conclusion == "success";
 }
 
@@ -245,6 +246,10 @@ async function canBeMerged(
   changedFiles
 ) {
   let changedFilesNotApproved = changedFiles;
+  if (!(await isCheckSuiteGreen(octokit, repoDeeets, pr))) {
+    core.info("Check suite not green");
+    return false;
+  }
   if (!(await hasMergeCommand(octokit, repoDeeets, pr, owners))) {
     core.info("Missing /merge command by an owner");
     return false;
@@ -252,10 +257,6 @@ async function canBeMerged(
   const approvers = await getApprovers(octokit, repoDeeets, pr);
   if (approvers.length < 1) {
     core.info("Missing approvals for PR");
-    return false;
-  }
-  if (!(await isCheckSuiteGreen(octokit, repoDeeets, pr))) {
-    core.info("Check suite not green");
     return false;
   }
 
