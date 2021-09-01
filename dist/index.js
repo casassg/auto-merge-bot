@@ -102,11 +102,12 @@ async function setLabels(octokit, repoDeets, labelConfigs, prNumber) {
       });
     }
   }
-
+  const labels = labelConfigs.map((l) => l.name);
+  core.info(`Setting labels: ${new Intl.ListFormat().format(labels)}`);
   await octokit.issues.setLabels({
     ...repoDeets,
     issue_number: prNumber,
-    labels: labelConfigs.map((l) => l.name),
+    labels: labels,
   });
 }
 
