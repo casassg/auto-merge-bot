@@ -115,11 +115,11 @@ async function assignReviewer(octokit, owners, repoDeeets, pr) {
   owners.sort(() => Math.random() - 0.5);
 
   // remove pr owner from list
-  owners = owners.filter((o) => o !== '@'+pr.user.login);
-  core.info(`Elegible reviewers: ${owners}`)
+  owners = owners.filter((o) => o !== "@" + pr.user.login);
+  core.info(`Elegible reviewers: ${owners}`);
 
   // Randomly get a user to assign to this PR with the minimum number of PRs assigned to them
-  let assignee = '';
+  let assignee = "";
   let minPRs = Number.MAX_SAFE_INTEGER;
   owners.forEach((user) => {
     if ((assignedToPRs[user] || 0) < minPRs) {
@@ -131,8 +131,8 @@ async function assignReviewer(octokit, owners, repoDeeets, pr) {
   core.info(
     `Arbitrary choosen ${assignee} as assigned reviewer! PR assigned: ${minPRs}`
   );
-  if (assignee !== '') {
-    const assigneUsername = assignee.replace("@", "")
+  if (assignee !== "") {
+    const assigneUsername = assignee.replace("@", "");
     await octokit.issues.addAssignees({
       ...repoDeeets,
       issue_number: pr.number,
@@ -143,23 +143,23 @@ async function assignReviewer(octokit, owners, repoDeeets, pr) {
 }
 
 async function welcomeMessage(octokit, repoDeets, prNumber, assignee) {
-  let message = ''
+  let message = "";
   if (assignee) {
     message = `Thanks for the PR! :rocket:
 
-    Owners will be reviewing this PR. Assigned reviewer: ${assignee}
+Owners will be reviewing this PR. Assigned reviewer: ${assignee}
   
-    Approve using \`/lgtm\` and mark for automatic merge by using \`/merge\`.
-  ${ourSignature}`;  
+Approve using \`/lgtm\` and mark for automatic merge by using \`/merge\`.
+  ${ourSignature}`;
   } else {
     message = `Thanks for the PR! :rocket:
 
-    Owners will be reviewing this PR. No automatic reviewer could be found.
+Owners will be reviewing this PR. No automatic reviewer could be found.
   
-    Approve using \`/lgtm\` and mark for automatic merge by using \`/merge\`.
+Approve using \`/lgtm\` and mark for automatic merge by using \`/merge\`.
   ${ourSignature}`;
   }
-  
+
   octokit.issues.createComment({
     ...repoDeets,
     issue_number: prNumber,
@@ -291,7 +291,7 @@ async function run() {
   const pr = context.payload.pull_request;
   const repoDeets = { owner: context.repo.owner, repo: context.repo.repo };
   const changedFiles = await getChangedFiles(octokit, repoDeets, pr.number);
-  
+
   const { users: owners, labels: labels } = await getCodeOwnersAndLabels(
     changedFiles,
     codeowners
@@ -300,12 +300,7 @@ async function run() {
     if (await hasPRWelcomeMessage(octokit, repoDeets, pr.number)) {
       core.info(`PR already welcomed`);
     } else {
-      const assignee = await assignReviewer(
-        octokit,
-        owners,
-        repoDeets,
-        pr
-      );
+      const assignee = await assignReviewer(octokit, owners, repoDeets, pr);
       core.info(`Assigned reviewer: ${assignee}. Sending welcome message!`);
       await welcomeMessage(octokit, repoDeets, pr.number, assignee);
     }
@@ -313,7 +308,11 @@ async function run() {
     const body = getPayloadBody();
     const sender = context.payload.sender.login;
 
-    if (body.match(lgtmRegex) && owners.includes(sender) && sender !== pr.user.login) {
+    if (
+      body.match(lgtmRegex) &&
+      owners.includes(sender) &&
+      sender !== pr.user.login
+    ) {
       await octokit.issues.createComment({
         ...repoDeets,
         issue_number: pr.number,
@@ -321,7 +320,11 @@ async function run() {
       });
     }
 
-    if (body.match(mergeRegex) && owners.includes(sender) && sender !== pr.user.login) {
+    if (
+      body.match(mergeRegex) &&
+      owners.includes(sender) &&
+      sender !== pr.user.login
+    ) {
       await octokit.issues.createComment({
         ...repoDeets,
         issue_number: pr.number,
