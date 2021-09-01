@@ -90,7 +90,7 @@ async function isCheckSuiteGreen(octokit, repoDeeets, prNumber) {
   return checkSuite.status == "completed" && checkSuite.conclusion == "success";
 }
 
-async function assignReviewer(octokit, owners, repoDeeets, prNumber) {
+async function assignReviewer(octokit, owners, repoDeeets, pr) {
   // Get a list of all open pull requests to current repository with base branch set as main
   const openPullRequests = await octokit.pulls.list({
     ...repoDeeets,
@@ -114,6 +114,9 @@ async function assignReviewer(octokit, owners, repoDeeets, prNumber) {
   // This is to prevent people from getting the same assignation every time.
   owners.sort(() => Math.random() - 0.5);
 
+  // remove pr owner from list
+  owners = owners.filter((o) => o !== pr.user.login);
+  
   // Randomly get a user to assign to this PR with the minimum number of PRs assigned to them
   let assignee = null;
   let minPRs = Number.MAX_SAFE_INTEGER;
@@ -129,7 +132,7 @@ async function assignReviewer(octokit, owners, repoDeeets, prNumber) {
   );
   await octokit.issues.addAssignees({
     ...repoDeeets,
-    issue_number: prNumber,
+    issue_number: pr.number,
     assignees: [assignee],
   });
   return assignee;
@@ -167,7 +170,7 @@ async function getApprovers(octokit, repoDeets, pr) {
   let users = [];
   comments.forEach((comment) => {
     if (
-      comment.body.matches(lgtmRegex) &&
+      comment.body.match(lgtmRegex) &&
       comment.user.login !== pr.user.login &&
       !comment.body.includes(ourSignature)
     ) {
@@ -181,7 +184,7 @@ async function getApprovers(octokit, repoDeets, pr) {
   });
   reviewComments.forEach((comment) => {
     if (
-      (comment.state === "APPROVED" || comment.body.matches(lgtmRegex)) &&
+      (comment.state === "APPROVED" || comment.body.match(lgtmRegex)) &&
       comment.user.login !== pr.user.login &&
       !comment.body.includes(ourSignature)
     )
@@ -198,7 +201,7 @@ async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
   });
   let hasMergeCommand = comments.data.find(
     (c) =>
-      c.body.matches(mergeRegex) &&
+      c.body.match(mergeRegex) &&
       c.user.login !== pr.user.login &&
       owners.includes(c.user.login)
   );
