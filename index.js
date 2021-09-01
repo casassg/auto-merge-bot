@@ -267,11 +267,7 @@ async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
 }
 
 async function updateWelcomeComment(octokit, repoDeets, prNumber, message) {
-  const { data: comments } = await octokit.issues.listComments({
-    ...repoDeets,
-    issue_number: prNumber,
-  });
-  const welcomeComment = comments.find((c) => c.body.includes(ourSignature));
+  const welcomeComment = await hasPRWelcomeMessage(octokit, repoDeets, prNumber);
   if (welcomeComment) {
     octokit.issues.updateComment({
       ...repoDeets,
