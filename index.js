@@ -215,7 +215,8 @@ async function getApprovers(octokit, repoDeets, pr, owners) {
   comments.forEach((comment) => {
     if (
       comment.body.match(lgtmRegex) &&
-      (!owners || owners.includes("@" + comment.user.login)) &&
+      (owners === 0 || owners.includes("@" + comment.user.login)) &&
+      comment.user.login !== pr.user.login &&
       !comment.body.includes(ourSignature)
     ) {
       core.info(`Found lgtm comment from ${comment.user.login}`);
@@ -229,7 +230,8 @@ async function getApprovers(octokit, repoDeets, pr, owners) {
   reviewComments.forEach((comment) => {
     if (
       (comment.state === "APPROVED" || comment.body.match(lgtmRegex)) &&
-      (!owners || owners.includes("@" + comment.user.login)) &&
+      (owners === 0 || owners.includes("@" + comment.user.login)) &&
+      comment.user.login !== pr.user.login &&
       !comment.body.includes(ourSignature)
     )
       core.info(`Found lgtm comment from ${comment.user.login}`);
@@ -246,7 +248,8 @@ async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
   let hasMergeCommand = comments.data.find(
     (c) =>
       c.body.match(mergeRegex) &&
-      (!owners || owners.includes("@" + c.user.login))
+      (owners.length === 0 || owners.includes("@" + c.user.login)) &&
+      c.user.login !== pr.user.login
   );
   if (hasMergeCommand) {
     core.info(`Found merge comment from ${hasMergeCommand.user.login}`);
@@ -261,7 +264,8 @@ async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
   const hasMergeCommandReview = reviewComments.find(
     (c) =>
       c.body.match(mergeRegex) &&
-      (!owners || owners.includes("@" + c.user.login))
+      (owners.length === 0 || owners.includes("@" + c.user.login)) &&
+      c.user.login !== pr.user.login
   );
   if (hasMergeCommandReview) {
     core.info(`Found merge review from ${hasMergeCommandReview.user.login}`);
@@ -276,12 +280,14 @@ async function updateWelcomeComment(octokit, repoDeets, prNumber, message) {
     repoDeets,
     prNumber
   );
-  core.info(`Welcome comment update to: ${message}`);
-  octokit.issues.updateComment({
-    ...repoDeets,
-    comment_id: welcomeComment.id,
-    body: message + ourSignature,
-  });
+  if (welcomeComment) {
+    core.info(`Welcome comment update to: ${message}`);
+    octokit.issues.updateComment({
+      ...repoDeets,
+      comment_id: welcomeComment.id,
+      body: message + ourSignature,
+    });
+  }
 }
 
 async function canBeMerged(
@@ -294,20 +300,6 @@ async function canBeMerged(
 ) {
   let changedFilesNotApproved = changedFiles;
   const approverOwners = owners.filter((o) => o !== "@" + pr.user.login);
-  if (owners.length === 0) {
-    core.info(
-      "No owners for changes found. No automatic merge is possible. Consider adding root owners!"
-    );
-    await updateWelcomeComment(
-      octokit,
-      repoDeeets,
-      pr.number,
-      `Thanks for the PR! 🚀
-
-No owners for changes found. No automatic merge is possible.`
-    );
-    process.exit(0);
-  }
   if (approverOwners.length === 0) {
     core.info(
       "Seems PR user is only owner. Will accept anyone to merge or approve."
@@ -444,6 +436,21 @@ async function run() {
     core.info(`Adding label ${label}`);
     await addLabel(octokit, repoDeets, labelConfig, pr.number);
   }
+  if (owners.length === 0) {
+    core.info(
+      "No owners for changes found. No automatic merge is possible. Consider adding root owners!"
+    );
+    await updateWelcomeComment(
+      octokit,
+      repoDeets,
+      pr.number,
+      `Thanks for the PR! 🚀
+
+No owners for changes found. No automatic merge is possible.`
+    );
+    process.exit(0);
+  }
+
   const approved = await canBeMerged(
     octokit,
     repoDeets,
