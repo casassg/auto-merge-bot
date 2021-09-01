@@ -301,13 +301,14 @@ async function isApproved(
   changedFiles
 ) {
   let changedFilesNotApproved = changedFiles;
-  
 
   const approvers = await getApprovers(octokit, repoDeeets, pr, owners);
   if (approvers.length === 0) {
-    core.info(`Missing approvals for PR. Potential owners: ${new Intl.ListFormat().format(
-      owners
-    )}`);
+    core.info(
+      `Missing approvals for PR. Potential owners: ${new Intl.ListFormat().format(
+        owners
+      )}`
+    );
     return false;
   }
 

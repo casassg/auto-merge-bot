@@ -308,25 +308,14 @@ async function isApproved(
   changedFiles
 ) {
   let changedFilesNotApproved = changedFiles;
-  const approverOwners = owners.filter((o) => o !== "@" + pr.user.login);
-  if (approverOwners.length === 0) {
-    core.info(
-      "Seems PR user is only owner. Will accept anyone to merge or approve."
-    );
-    // Wait a few secons to make sure first comment is published.
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-    await welcomeMessage(
-      octokit,
-      repoDeeets,
-      pr.number,
-      `Thanks for the PR! 🚀
 
-Seems you are only owner for changes on this PR. Any user can use \`/merge\` or \`/lgtm\` to merge or approve.`
-    );
-  }
-  const approvers = await getApprovers(octokit, repoDeeets, pr, approverOwners);
+  const approvers = await getApprovers(octokit, repoDeeets, pr, owners);
   if (approvers.length === 0) {
-    core.info(`Missing approvals for PR. Potential owners: ${approverOwners}`);
+    core.info(
+      `Missing approvals for PR. Potential owners: ${new Intl.ListFormat().format(
+        owners
+      )}`
+    );
     return false;
   }
 
@@ -453,6 +442,8 @@ Owners will be reviewing this PR. No automatic reviewer could be found.`;
     core.info(
       "No owners for changes found. No automatic merge is possible. Consider adding root owners!"
     );
+    // Wait a few secons to make sure first comment is published.
+    await new Promise((resolve) => setTimeout(resolve, 5000));
     await welcomeMessage(
       octokit,
       repoDeets,
@@ -462,12 +453,28 @@ Owners will be reviewing this PR. No automatic reviewer could be found.`;
     process.exit(0);
   }
 
+  const approverOwners = owners.filter((o) => o !== "@" + pr.user.login);
+  if (approverOwners.length === 0) {
+    core.info(
+      "Seems PR user is only owner. Will accept anyone to merge or approve."
+    );
+    // Wait a few secons to make sure first comment is published.
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    await welcomeMessage(
+      octokit,
+      repoDeets,
+      pr.number,
+      `Thanks for the PR! 🚀
+
+Seems you are only owner for changes on this PR. Any user can use \`/merge\` or \`/lgtm\` to merge or approve.`
+    );
+  }
   const approved = await isApproved(
     octokit,
     repoDeets,
     pr,
     codeowners,
-    owners,
+    approverOwners,
     changedFiles
   );
   if (!approved) {
@@ -477,11 +484,11 @@ Owners will be reviewing this PR. No automatic reviewer could be found.`;
     process.exit(1);
   }
   labelConfigs.push(lgtmLabel);
-  if (!(await hasMergeCommand(octokit, repoDeets, pr, owners))) {
+  if (!(await hasMergeCommand(octokit, repoDeets, pr, approverOwners))) {
     labelConfigs.push(needsMergeLabel);
     core.info(
       `Missing /merge command by an owner: ${new Intl.ListFormat().format(
-        owners
+        approverOwners
       )}`
     );
     await setLabels(octokit, repoDeets, labelConfigs, pr.number);
