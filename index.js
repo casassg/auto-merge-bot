@@ -288,7 +288,7 @@ async function run() {
   // Setup
   const codeowners = new Codeowners(core.getInput("cwd") || process.cwd());
   const octokit = getOctokit(process.env.GITHUB_TOKEN);
-  const pr = context.payload.pull_request;
+  const pr = context.payload.pull_request || context.payload.issue;
   const repoDeets = { owner: context.repo.owner, repo: context.repo.repo };
   const changedFiles = await getChangedFiles(octokit, repoDeets, pr.number);
 
