@@ -273,13 +273,13 @@ async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
     ...repoDeeets,
     pull_number: pr.number,
   });
-  let hasMergeCommandReview = reviewComments.find(
+  const hasMergeCommandReview = reviewComments.find(
     (c) =>
       c.body.match(mergeRegex) &&
       c.user.login !== pr.user.login &&
       owners.includes("@" + c.user.login)
   );
-  if (hasMergeCommand) {
+  if (hasMergeCommandReview) {
     core.info(`Found lgtm review from ${hasMergeCommandReview.user.login}`);
     hasMergeCommand = true;
   }
