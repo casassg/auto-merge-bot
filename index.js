@@ -3,7 +3,6 @@
 const { context, getOctokit } = require("@actions/github");
 const core = require("@actions/core");
 const Codeowners = require("codeowners");
-const { readFileSync } = require("fs");
 const ourSignature = "<!-- Message About Merging -->";
 const lgtmRegex = /\/lgtm/i;
 const mergeRegex = /\/merge/i;
@@ -244,10 +243,13 @@ async function getApprovers(octokit, repoDeets, pr) {
 }
 
 async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
+  core.info(owners)
+  
   const comments = await octokit.issues.listComments({
     ...repoDeeets,
     issue_number: pr.number,
   });
+  core.info(JSON.stringify(comments.data))
   let hasMergeCommand = comments.data.find(
     (c) =>
       c.body.match(mergeRegex) &&
@@ -280,10 +282,6 @@ async function canBeMerged(
   changedFiles
 ) {
   let changedFilesNotApproved = changedFiles;
-  if (!(await isCheckSuiteGreen(octokit, repoDeeets, pr))) {
-    core.info("Check suite not green");
-    return false;
-  }
   if (!(await hasMergeCommand(octokit, repoDeeets, pr, owners))) {
     core.info("Missing /merge command by an owner");
     return false;
@@ -303,6 +301,10 @@ async function canBeMerged(
   });
   if (changedFilesNotApproved.length > 0) {
     core.info(`Missing files to be approved: ${changedFilesNotApproved}`);
+    return false;
+  }
+  if (!(await isCheckSuiteGreen(octokit, repoDeeets, pr))) {
+    core.info("Check suite not green");
     return false;
   }
   return approvers;
