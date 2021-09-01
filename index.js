@@ -133,10 +133,10 @@ async function assignReviewer(octokit, owners, repoDeeets, pr) {
   );
   if (assignee !== "") {
     const assigneUsername = assignee.replace("@", "");
-    await octokit.pulls.requestReviewers({
+    await octokit.issues.addAssignees({
       ...repoDeeets,
-      pull_number: pr.number,
-      reviewers: [assigneUsername],
+      issue_number: pr.number,
+      assignees: [assigneUsername],
     });
   }
   return assignee;
