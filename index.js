@@ -199,7 +199,6 @@ async function assignReviewer(octokit, owners, repoDeeets, pr) {
 }
 
 async function welcomeMessage(octokit, repoDeets, prNumber, message) {
-
   const comment = await hasPRWelcomeMessage(octokit, repoDeets, prNumber);
   if (comment) {
     if (comment.body.includes(message)) {
@@ -209,7 +208,7 @@ async function welcomeMessage(octokit, repoDeets, prNumber, message) {
     await octokit.issues.updateComment({
       ...repoDeets,
       comment_id: comment.id,
-      body:  message + ourSignature,
+      body: message + ourSignature,
     });
   } else {
     octokit.issues.createComment({
