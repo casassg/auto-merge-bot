@@ -280,12 +280,13 @@ async function updateWelcomeComment(octokit, repoDeets, prNumber, message) {
     repoDeets,
     prNumber
   );
-  if (welcomeComment) {
+  message = message + ourSignature
+  if (welcomeComment && welcomeComment.body !== message) {
     core.info(`Welcome comment update to: ${message}`);
     octokit.issues.updateComment({
       ...repoDeets,
       comment_id: welcomeComment.id,
-      body: message + ourSignature,
+      body: message,
     });
   }
 }
