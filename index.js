@@ -46,7 +46,7 @@ function getCodeOwnersAndLabels(changedFiles, codeowners) {
       if (o.startsWith("[")) labels.add(o.slice(1, o.length - 1));
     });
   }
-
+  core.info(`Found ${owners} owners and ${labels}`);
   return {
     users: Array.from(owners),
     labels: Array.from(labels),
