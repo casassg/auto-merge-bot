@@ -214,6 +214,7 @@ async function getApprovers(octokit, repoDeets, pr, owners) {
   let users = [];
   comments.forEach((comment) => {
     if (
+      !comment.body.includes(ourSignature) &&
       comment.body.match(lgtmRegex) &&
       (owners === 0 || owners.includes("@" + comment.user.login)) &&
       comment.user.login !== pr.user.login &&
@@ -247,6 +248,7 @@ async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
   });
   let hasMergeCommand = comments.data.find(
     (c) =>
+      !c.body.includes(ourSignature) &&
       c.body.match(mergeRegex) &&
       (owners.length === 0 || owners.includes("@" + c.user.login)) &&
       c.user.login !== pr.user.login
@@ -403,6 +405,7 @@ Owners will be reviewing this PR. No automatic reviewer could be found.`;
     if (
       body.match(lgtmRegex) &&
       (owners.length ===0 || owners.includes(sender)) &&
+      !body.includes(ourSignature) &&
       sender !== pr.user.login
     ) {
       await octokit.issues.createComment({
@@ -415,6 +418,7 @@ Owners will be reviewing this PR. No automatic reviewer could be found.`;
     if (
       body.match(mergeRegex) &&
       (owners.length ===0 || owners.includes(sender)) &&
+      !body.includes(ourSignature) &&
       sender !== pr.user.login
     ) {
       await octokit.issues.createComment({
