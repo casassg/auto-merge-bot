@@ -99,6 +99,8 @@ There are four options available at the moment:
 
 ### Dev
 
+- Install deps: `yarn install`
+
 ToDo(casassg): add tests back.
 
 <!-- Use `npx jest --watch` to run tests. -->
