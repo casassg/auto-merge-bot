@@ -143,13 +143,23 @@ async function assignReviewer(octokit, owners, repoDeeets, pr) {
 }
 
 async function welcomeMessage(octokit, repoDeets, prNumber, assignee) {
-  const message = `Thanks for the PR! :rocket:
+  let message = ''
+  if (assignee) {
+    message = `Thanks for the PR! :rocket:
 
-  Owners will be reviewing this PR. Assigned reviewer: ${assignee}
+    Owners will be reviewing this PR. Assigned reviewer: ${assignee}
+  
+    Approve using \`/lgtm\` and mark for automatic merge by using \`/merge\`.
+  ${ourSignature}`;  
+  } else {
+    message = `Thanks for the PR! :rocket:
 
-  Approve using \`/lgtm\` and mark for automatic merge by using \`/merge\`.
-${ourSignature}`;
-
+    Owners will be reviewing this PR. No automatic reviewer could be found.
+  
+    Approve using \`/lgtm\` and mark for automatic merge by using \`/merge\`.
+  ${ourSignature}`;
+  }
+  
   octokit.issues.createComment({
     ...repoDeets,
     issue_number: prNumber,
