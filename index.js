@@ -304,15 +304,15 @@ No owners for changes found. No automatic merge is possible.`)
 
 Seems ${pr.user.login} is only owner for changes. Any user can use \`/merge\` or \`/lgtm\` to merge or approve.`) 
   }
-  if (!(await hasMergeCommand(octokit, repoDeeets, pr, approverOwners))) {
-    core.info(`Missing /merge command by an owner: ${approverOwners}`);
-    return false;
-  }
   const approvers = await getApprovers(octokit, repoDeeets, pr, approverOwners);
   if (approvers.length === 0) {
     core.info(`Missing approvals for PR. Potential owners: ${approverOwners}`);
     const labelConfig = {name: "needs-lgtm", color: "FFA500"};
     await addLabel(octokit, repoDeeets, labelConfig, pr.number);
+    return false;
+  }
+  if (!(await hasMergeCommand(octokit, repoDeeets, pr, approverOwners))) {
+    core.info(`Missing /merge command by an owner: ${approverOwners}`);
     return false;
   }
 
