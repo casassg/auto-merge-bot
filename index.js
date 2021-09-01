@@ -280,7 +280,7 @@ async function updateWelcomeComment(octokit, repoDeets, prNumber, message) {
   octokit.issues.updateComment({
     ...repoDeets,
     comment_id: welcomeComment.id,
-    body: message,
+    body: message + ourSignature,
   });
 }
 
