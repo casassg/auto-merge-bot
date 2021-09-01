@@ -88,16 +88,19 @@ async function isCheckSuiteGreen(octokit, repoDeeets, pr) {
   const failedSuite = checkSuites.data.check_suites.find(
     (s) =>
       (s.status === "in_progress" ||
-        (s.status === "completed" && s.conclusion === "failure")) && !(s.id !== parseInt(process.env.GITHUB_JOB))
+        (s.status === "completed" && s.conclusion === "failure")) && !(s.id !== parseInt(process.env.GITHUB_ACTION))
   );
-  console.log(process.env.GITHUB_JOB);
+  console.log(process.env.GITHUB_ACTION);
+  console.log(process.env.GITHUB_RUN_NUMBER);
+  console.log(process.env.GITHUB_RUN_ID);
   if (failedSuite){
     console.log(failedSuite.app);
     core.info(
       `Check suite status: ${failedSuite.status} (${failedSuite.app})`
     );
+    return false
   }
-  return failedSuite !== undefined;
+  return true
 }
 
 async function assignReviewer(octokit, owners, repoDeeets, pr) {
