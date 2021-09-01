@@ -1,5 +1,5 @@
 {
-  "name": "code-owner-self-merge",
+  "name": "merge-bot-gh-actions",
   "version": "1.0.0",
   "main": "index.js",
   "license": "MIT",

@@ -1,387 +1,365 @@
 // @ts-check
 
-const { context, getOctokit } = require('@actions/github')
-const core = require('@actions/core');
-const Codeowners = require('codeowners');
-const {readFileSync} = require("fs");
+const { context, getOctokit } = require("@actions/github");
+const core = require("@actions/core");
+const Codeowners = require("codeowners");
+const { readFileSync } = require("fs");
+const ourSignature = "<!-- Message About Merging -->";
+const lgtmRegex = /\/lgtm/i;
+const mergeRegex = /\/merge/i;
 
-// Effectively the main function
-async function run() {
-  core.info("Running version 1.6.0")
-  let returnMessage = "";
-  // Tell folks they can merge
-  if (context.eventName === "pull_request_target") {
-    await commentOnMergablePRs()
-    await new Actor().mergeIfHasAccess();
-  }
+async function getChangedFiles(octokit, repoDeets, prNumber) {
+  // https://developer.github.com/v3/pulls/#list-pull-requests-files
+  const options = octokit.pulls.listFiles.endpoint.merge({
+    ...repoDeets,
+    pull_number: prNumber,
+  });
 
-  // Merge if they say they have access
-  if (context.eventName === "issue_comment" || context.eventName === "pull_request_review") {
-    const bodyLower = getPayloadBody().toLowerCase();
-    if (bodyLower.includes("/lgtm")) {
-      new Actor().mergeIfHasAccess();
-    } else if (bodyLower.includes("@github-actions close")) {
-      new Actor().closePROrIssueIfInCodeowners();
-    } else {
-      console.log("Doing nothing because the body does not include a command")
-    }
-    if (returnMessage) {
-      console.log(returnMessage)
-      core.setFailed(returnMessage);
-    }
-  }
+  /** @type { import("@octokit/types").PullsListFilesResponseData} */
+  const files = await octokit.paginate(options);
+  const fileStrings = files.map((f) => `/${f.filename}`);
+  return fileStrings;
 }
 
-async function commentOnMergablePRs() {
-  if (context.eventName !== "pull_request_target") {
-    throw new Error("This function can only run when the workflow specifies `pull_request_target` in the `on:`.")
-  }
-
-  // Setup
-  const cwd = core.getInput('cwd') || process.cwd()
-  const octokit = getOctokit(process.env.GITHUB_TOKEN)
-  const pr = context.payload.pull_request
-  const thisRepo = { owner: context.repo.owner, repo: context.repo.repo }
-
-  core.info(`\nLooking at PR: '${pr.title}' to see if the changed files all fit inside one set of code-owners to make a comment`)
-
-  const co = new Codeowners(cwd);
-  core.info(`Code-owners file found at: ${co.codeownersFilePath}`)
-
-  const changedFiles = await getPRChangedFiles(octokit, thisRepo, pr.number)
-  core.info(`Changed files: \n - ${changedFiles.join("\n - ")}`)
-
-  const codeowners = findCodeOwnersForChangedFiles(changedFiles, cwd)
-  core.info(`Code-owners: \n - ${codeowners.users.join("\n - ")}`)
-  core.info(`Labels: \n - ${codeowners.labels.join("\n - ")}`)
-
-  if (!codeowners.users.length) {
-    console.log("This PR does not have any code-owners")
-    process.exit(0)
-  }
-
-  const ourSignature = "<!-- Message About Merging -->"
-  const comments = await octokit.issues.listComments({ ...thisRepo, issue_number: pr.number })
-  const existingComment = comments.data.find(c => c.body.includes(ourSignature))
-  if (existingComment) {
-    console.log("There is an existing comment. Skipping adding welcome message!")
-    return
-  }
-
-
-  // Get a list of all open pull requests to current repository with base branch set as main
-  const openPullRequests = await octokit.pulls.list({
-    owner: thisRepo.owner,
-    repo: thisRepo.repo,
-    state: "open",
-    base: 'main'
-  })
-
-  // Get a dictionary of users assigned to PRs as key and times assigned as value
-  let assignedToPRs = {}
-  for (const pr of openPullRequests.data) {
-    if (pr.assignees.length) {
-      for (const assignee of pr.assignees) {
-        assignedToPRs[assignee.login] = assignedToPRs[assignee.login] || 0
-        assignedToPRs[assignee.login] += 1
-      }
-    }
-  }
-
-  // Shuffle codeowners list to randomise who gets the assignation.
-  // This is to prevent people from getting the same assignation every time.
-  codeowners.users.sort(() => Math.random() - 0.5)
-
-  // Randomly get a user to assign to this PR with the minimum number of PRs assigned to them
-  let assignee = null
-  let minPRs = Number.MAX_SAFE_INTEGER
-  codeowners.users.forEach(user => {
-    if ((assignedToPRs[user] || 0) < minPRs) {
-      assignee = user
-      minPRs = assignedToPRs[user]
-    }
-  })
-  
-  core.info(`Arbitrary choosen ${assignee} as assigned reviewer! PR assigned: ${minPRs}`)
-  await octokit.issues.addAssignees({ ...thisRepo, issue_number: pr.number, assignees: [assignee]})
-
-
-  const message = `Thanks for the PR! :rocket:
-
-  Owners will be reviewing this PR. Assigned reviewer: ${assignee}
-
-  Approve using \`/lgtm\` to merge.
-${ourSignature}`
-
-  await octokit.issues.createComment({ ...thisRepo, issue_number: pr.number, body: message });
-
-  // Add labels
-  for (const label of codeowners.labels) {
-    const labelConfig = { name: label, color: Math.random().toString(16).slice(2, 8) }
-    await createOrAddLabel(octokit, { ...thisRepo, id: pr.number }, labelConfig)
-  }
-}
-
-function getPayloadBody() {
-  const body = context.payload.comment ? context.payload.comment.body : context.payload.review.body
-  if (body == null) {
-    throw new Error(`No body found, ${JSON.stringify(context)}`)
-  }
-  return body;
-}
-
-class Actor {
-  constructor() {
-    this.cwd = core.getInput('cwd') || process.cwd()
-    this.octokit = getOctokit(process.env.GITHUB_TOKEN)
-    this.thisRepo = { owner: context.repo.owner, repo: context.repo.repo }
-    this.issue = context.payload.issue || context.payload.pull_request
-    /** @type {string} - GitHub login */
-    this.sender = context.payload.sender.login
-  }
-
-  async getTargetPRIfHasAccess() {
-    const { octokit, thisRepo, sender, issue, cwd } = this;
-    core.info(`\n\nLooking at the ${context.eventName} from ${sender} in '${issue.title}' to see if we can proceed`)
-
-    const changedFiles = await getPRChangedFiles(octokit, thisRepo, issue.number)
-    core.info(`Changed files: \n - ${changedFiles.join("\n - ")}`)
-    let changedNotApprovedFiles = changedFiles;
-
-    // const comments = await octokit.issues.listComments({ ...thisRepo, issue_number: issue.number })
-    // Get a list of all comments that contain lgtm in the body for a GitHub issue with issue.number with pagination
-
-
-
-    const { data: comments } = await octokit.issues.listComments({ ...thisRepo, issue_number: issue.number })
-    let haslgtm = false;
-    comments.forEach(comment => {
-      if (comment.body.includes("lgtm") && comment.user.login !== issue.user.login && !comment.body.includes("<!-- Message About Merging -->")) {
-        haslgtm = true;
-        core.info(`Found lgtm comment from ${comment.user.login}`)
-        changedNotApprovedFiles = getFilesNotOwnedByCodeOwner("@" + comment.user.login, changedNotApprovedFiles, cwd)
-      }
-    });
-    if (!haslgtm){
-      core.setFailed(`Required to have at least 1 lgtm from someone else than yourself!`); 
-      process.exit(1)
-    }
-    
-    changedNotApprovedFiles = getFilesNotOwnedByCodeOwner("@" + issue.user.login, changedNotApprovedFiles, cwd)
-    changedNotApprovedFiles = getFilesNotOwnedByCodeOwner("@" + sender, changedNotApprovedFiles, cwd)
-    if (changedNotApprovedFiles.length !== 0) {
-      console.log(`Not approved changes: \n - ${changedNotApprovedFiles.join("\n - ")}\n`)
-      listFilesWithOwners(changedFiles, cwd)
-      let body = `Missing approvals for:\n\n${getFilesWithOwners(changedNotApprovedFiles)}`
-      core.setFailed(body); 
-      process.exit(1)
-    }
-
-    const prInfo = await octokit.pulls.get({ ...thisRepo, pull_number: issue.number })
-    return prInfo
-  }
-
-  async mergeIfHasAccess() {
-    const prInfo = await this.getTargetPRIfHasAccess()
-    if (!prInfo) {
-      core.setFailed(`Missing approvals for PR to be merged`); 
-      process.exit(1)
-    };
-
-
-    const { octokit, thisRepo, issue, sender } = this;
-
-    // Don't try merge unmergable stuff
-    if (!prInfo.data.mergeable) {
-      core.setFailed(`Sorry, this PR has merge conflicts. They'll need to be fixed before this can be merged.`);
-      process.exit(1)
-    }
-
-    // Don't merge red PRs
-    const statusInfo = await octokit.repos.listCommitStatusesForRef({ ...thisRepo, ref: prInfo.data.head.sha })
-    const failedStatus = statusInfo.data
-      // Check only the most recent for a set of duplicated statuses
-      .filter(
-        (thing, index, self) =>
-          index === self.findIndex((t) => t.target_url === thing.target_url)
-      )
-      .find(s => s.state !== "success")
-
-    if (failedStatus) {
-      core.setFailed(`Sorry, this PR could not be merged because it wasn't green. Blocked by [${failedStatus.context}](${failedStatus.target_url}): '${failedStatus.description}'.`)
-      process.exit(1)
-    }
-
-    core.info(`Creating comments and merging`)
-    try {
-      // @ts-ignore
-      await octokit.pulls.merge({ ...thisRepo, pull_number: issue.number, merge_method: core.getInput('merge_method') || 'squash' });
-      await octokit.issues.createComment({ ...thisRepo, issue_number: issue.number, body: `Merged - thanks for the contribution! :tada:` });
-    } catch (error) {
-      core.info(`Merging (or commenting) failed:`)
-      core.error(error)
-      core.setFailed("Failed to merge")
-      process.exit(1)
-      
-    }
-  }
-
-  async closePROrIssueIfInCodeowners() { 
-    // Because closing a PR/issue does not mutate the repo, we can use a weaker
-    // authentication method: basically is the person in the codeowners? Then they can close
-    // an issue or PR. 
-    if (!githubLoginIsInCodeowners(this.sender, this.cwd)) return
-
-    const { octokit, thisRepo, issue, sender } = this;
-
-    core.info(`Creating comments and closing`)
-    await octokit.issues.update({ ...thisRepo, issue_number: issue.number, state: "closed" });
-    await octokit.issues.createComment({ ...thisRepo, issue_number: issue.number, body: `Closing because @${sender} is one of the code-owners of this repository.` });
-  }
-}
-
-/**
- *
- * @param {string} owner
- * @param {string[]} files
- * @param {string} cwd
- */
-function getFilesNotOwnedByCodeOwner(owner, files, cwd) {
-  const filesWhichArentOwned = []
-  const codeowners = new Codeowners(cwd);
+function getFilesNotOwnedByCodeOwner(owner, files, codeowners) {
+  const filesWhichArentOwned = [];
 
   for (const file of files) {
-    const relative = file.startsWith("/") ? file.slice(1) : file
+    const relative = file.startsWith("/") ? file.slice(1) : file;
     let owners = codeowners.getOwner(relative);
     if (!owners.includes(owner)) {
-      filesWhichArentOwned.push(file)
+      filesWhichArentOwned.push(file);
     }
   }
 
-  return filesWhichArentOwned
+  return filesWhichArentOwned;
 }
 
-
-/**
- * This is a reasonable security measure for proving an account is specified in the codeowners
- * but _SHOULD NOT_ be used for authentication for something which mutates the repo,
- * 
- * @param {string} login
- * @param {string} cwd
- */
- function githubLoginIsInCodeowners(login, cwd) {
-  const codeowners = new Codeowners(cwd);
-  const contents = readFileSync(codeowners.codeownersFilePath, "utf8").toLowerCase()
-
-  return contents.includes("@" + login.toLowerCase() + " ") || contents.includes("@" + login.toLowerCase() + "\n")
-}
-
-
-/**
- *
- * @param {string[]} files
- * @param {string} cwd
- */
-function listFilesWithOwners(files, cwd) {
-  const codeowners = new Codeowners(cwd);
-  console.log("\nKnown code-owners for changed files:")
-  for (const file of files) {
-    const relative = file.startsWith("/") ? file.slice(1) : file
-    let owners = codeowners.getOwner(relative);
-    console.log(`- ${file} (${new Intl.ListFormat().format(owners)})`)
-  }
-  console.log("\n> CODEOWNERS file:")
-  console.log(readFileSync(codeowners.codeownersFilePath, "utf8"))
-}
-
-function getFilesWithOwners(files, cwd) {
-    let returnStr = ""
-    const codeowners = new Codeowners(cwd);
-    console.log("\nKnown code-owners for changed files:")
-    for (const file of files) {
-      const relative = file.startsWith("/") ? file.slice(1) : file
-      let owners = codeowners.getOwner(relative).map(o => o.replace("@", ""));
-      returnStr += `- ${file} (${new Intl.ListFormat().format(owners)})\n`
-    }
-    return returnStr
-  }
-
-
-function findCodeOwnersForChangedFiles(changedFiles, cwd)  {
-  const owners = new Set()
-  const labels = new Set()
-  const codeowners = new Codeowners(cwd);
+function getCodeOwnersAndLabels(changedFiles, codeowners) {
+  const owners = new Set();
+  const labels = new Set();
 
   for (const file of changedFiles) {
-    const relative = file.startsWith("/") ? file.slice(1) : file
-    const fileOwners = codeowners.getOwner(relative)
-    fileOwners.forEach(o => {
-      if (o.startsWith("@")) owners.add(o)
-      if (o.startsWith("[")) labels.add(o.slice(1, o.length-1))
-    })
+    const relative = file.startsWith("/") ? file.slice(1) : file;
+    const fileOwners = codeowners.getOwner(relative);
+    fileOwners.forEach((o) => {
+      if (o.startsWith("@")) owners.add(o);
+      if (o.startsWith("[")) labels.add(o.slice(1, o.length - 1));
+    });
   }
 
   return {
     users: Array.from(owners),
-    labels: Array.from(labels)
-  }
+    labels: Array.from(labels),
+  };
 }
 
-async function getPRChangedFiles(octokit, repoDeets, prNumber) {
-  // https://developer.github.com/v3/pulls/#list-pull-requests-files
-  const options = octokit.pulls.listFiles.endpoint.merge({...repoDeets, pull_number: prNumber });
-
-  /** @type { import("@octokit/types").PullsListFilesResponseData} */
-  const files = await octokit.paginate(options)
-  const fileStrings = files.map(f => `/${f.filename}`)
-  return fileStrings
-}
-
-async function createOrAddLabel(octokit, repoDeets, labelConfig) {
-  let label = null
-    const existingLabels = await octokit.paginate('GET /repos/:owner/:repo/labels', { owner: repoDeets.owner, repo: repoDeets.repo })
-    label = existingLabels.find(l => l.name == labelConfig.name)
+async function addLabel(octokit, repoDeets, labelConfig, prNumber) {
+  let label = null;
+  const existingLabels = await octokit.paginate(
+    "GET /repos/:owner/:repo/labels",
+    { owner: repoDeets.owner, repo: repoDeets.repo }
+  );
+  label = existingLabels.find((l) => l.name == labelConfig.name);
 
   // Create the label if it doesn't exist yet
   if (!label) {
     await octokit.issues.createLabel({
-      owner: repoDeets.owner,
-      repo: repoDeets.repo,
+      ...repoDeets,
       name: labelConfig.name,
       color: labelConfig.color,
-      description: labelConfig.description,
-    })
+      description: labelConfig.description || "",
+    });
   }
 
   await octokit.issues.addLabels({
-    owner: repoDeets.owner,
-    repo: repoDeets.repo,
-    issue_number: repoDeets.id,
+    ...repoDeets,
+    issue_number: prNumber,
     labels: [labelConfig.name],
-  })
+  });
 }
 
-// For tests
-module.exports = {
-  getFilesNotOwnedByCodeOwner,
-  findCodeOwnersForChangedFiles,
-  githubLoginIsInCodeowners
+async function isCheckSuiteGreen(octokit, repoDeeets, prNumber) {
+  const checkSuites = await octokit.checks.listSuitesForRef({
+    ...repoDeeets,
+    ref: `pull/${prNumber}/head`,
+  });
+  const checkSuite = checkSuites.data.check_suites.find(
+    (s) => s.app.slug == "github-actions"
+  );
+  return checkSuite.status == "completed" && checkSuite.conclusion == "success";
+}
+
+async function assignReviewer(octokit, owners, repoDeeets, prNumber) {
+  // Get a list of all open pull requests to current repository with base branch set as main
+  const openPullRequests = await octokit.pulls.list({
+    ...repoDeeets,
+    state: "open",
+    base: "main",
+  });
+
+  // Get a dictionary of users assigned to PRs as key and times assigned as value
+  let assignedToPRs = {};
+  openPullRequests.data.forEach((pr) => {
+    pr.assignees.forEach((assignee) => {
+      if (assignedToPRs[assignee.login]) {
+        assignedToPRs[assignee.login] += 1;
+      } else {
+        assignedToPRs[assignee.login] = 1;
+      }
+    });
+  });
+
+  // Shuffle codeowners list to randomise who gets the assignation.
+  // This is to prevent people from getting the same assignation every time.
+  owners.sort(() => Math.random() - 0.5);
+
+  // Randomly get a user to assign to this PR with the minimum number of PRs assigned to them
+  let assignee = null;
+  let minPRs = Number.MAX_SAFE_INTEGER;
+  owners.forEach((user) => {
+    if ((assignedToPRs[user] || 0) < minPRs) {
+      assignee = user;
+      minPRs = assignedToPRs[user];
+    }
+  });
+
+  core.info(
+    `Arbitrary choosen ${assignee} as assigned reviewer! PR assigned: ${minPRs}`
+  );
+  await octokit.issues.addAssignees({
+    ...repoDeeets,
+    issue_number: prNumber,
+    assignees: [assignee],
+  });
+  return assignee;
+}
+
+async function welcomeMessage(octokit, repoDeets, prNumber, assignee) {
+  const message = `Thanks for the PR! :rocket:
+
+  Owners will be reviewing this PR. Assigned reviewer: ${assignee}
+
+  Approve using \`/lgtm\` and mark for automatic merge by using \`/merge\`.
+${ourSignature}`;
+
+  octokit.issues.createComment({
+    ...repoDeets,
+    issue_number: prNumber,
+    body: message,
+  });
+}
+
+async function hasPRWelcomeMessage(octokit, repoDeeets, prNumber) {
+  const comments = await octokit.issues.listComments({
+    ...repoDeeets,
+    issue_number: prNumber,
+  });
+  const hasMessage = comments.data.find((c) => c.body.includes(ourSignature));
+  return hasMessage;
+}
+
+async function getApprovers(octokit, repoDeets, pr) {
+  const { data: comments } = await octokit.issues.listComments({
+    ...repoDeets,
+    issue_number: pr.number,
+  });
+  let users = [];
+  comments.forEach((comment) => {
+    if (
+      comment.body.matches(lgtmRegex) &&
+      comment.user.login !== pr.user.login &&
+      !comment.body.includes(ourSignature)
+    ) {
+      core.info(`Found lgtm comment from ${comment.user.login}`);
+      users.push(comment.user.login);
+    }
+  });
+  const { data: reviewComments } = await octokit.pulls.listReviews({
+    ...repoDeets,
+    pull_number: pr.number,
+  });
+  reviewComments.forEach((comment) => {
+    if (
+      (comment.state === "APPROVED" || comment.body.matches(lgtmRegex)) &&
+      comment.user.login !== pr.user.login &&
+      !comment.body.includes(ourSignature)
+    )
+      core.info(`Found lgtm comment from ${comment.user.login}`);
+    users.push(comment.user.login);
+  });
+  return users;
+}
+
+async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
+  const comments = await octokit.issues.listComments({
+    ...repoDeeets,
+    issue_number: pr.number,
+  });
+  let hasMergeCommand = comments.data.find(
+    (c) =>
+      c.body.matches(mergeRegex) &&
+      c.user.login !== pr.user.login &&
+      owners.includes(c.user.login)
+  );
+
+  const { data: reviewComments } = await octokit.pulls.listReviews({
+    ...repoDeeets,
+    pull_number: pr.number,
+  });
+  let hasMergeCommandReview = reviewComments.find(
+    (c) =>
+      c.body.includes(mergeRegex) &&
+      c.user.login !== pr.user.login &&
+      c.user.login in owners
+  );
+  if (hasMergeCommandReview) {
+    hasMergeCommand = true;
+  }
+  return hasMergeCommand;
+}
+
+async function canBeMerged(
+  octokit,
+  repoDeeets,
+  pr,
+  codeowners,
+  owners,
+  changedFiles
+) {
+  let changedFilesNotApproved = changedFiles;
+  if (!(await hasMergeCommand(octokit, repoDeeets, pr, owners))) {
+    core.info("Missing /merge command by an owner");
+    return false;
+  }
+  const approvers = await getApprovers(octokit, repoDeeets, pr);
+  if (approvers.length < 1) {
+    core.info("Missing approvals for PR");
+    return false;
+  }
+  if (!(await isCheckSuiteGreen(octokit, repoDeeets, pr))) {
+    core.info("Check suite not green");
+    return false;
+  }
+
+  approvers.forEach((approver) => {
+    changedFilesNotApproved = getFilesNotOwnedByCodeOwner(
+      "@" + approver,
+      changedFilesNotApproved,
+      codeowners
+    );
+  });
+  if (changedFilesNotApproved.length > 0) {
+    core.info(`Missing files to be approved: ${changedFilesNotApproved}`);
+    return false;
+  }
+  return approvers;
+}
+
+function getPayloadBody() {
+  const body = context.payload.comment
+    ? context.payload.comment.body
+    : context.payload.review.body;
+  if (body == null) {
+    throw new Error(`No body found, ${JSON.stringify(context)}`);
+  }
+  return body;
+}
+
+// Effectively the main function
+async function run() {
+  // Setup
+  const codeowners = new Codeowners(core.getInput("cwd") || process.cwd());
+  const octokit = getOctokit(process.env.GITHUB_TOKEN);
+  const pr = context.payload.pull_request;
+  const repoDeets = { owner: context.repo.owner, repo: context.repo.repo };
+  const changedFiles = await getChangedFiles(octokit, repoDeets, pr.number);
+  const { users: owners, labels: labels } = await getCodeOwnersAndLabels(
+    changedFiles,
+    codeowners
+  );
+  if (context.eventName === "pull_request_target") {
+    if (await hasPRWelcomeMessage(octokit, repoDeets, pr.number)) {
+      core.info(`PR already welcomed`);
+    } else {
+      const assignee = await assignReviewer(
+        octokit,
+        owners,
+        repoDeets,
+        pr.number
+      );
+      core.info(`Assigned reviewer: ${assignee}. Sending welcome message!`);
+      await welcomeMessage(octokit, repoDeets, pr.number, assignee);
+    }
+  } else {
+    const body = getPayloadBody();
+    if (body.match(lgtmRegex)) {
+      await octokit.issues.createComment({
+        ...repoDeets,
+        issue_number: pr.number,
+        body: `Approval received from @${context.payload.sender.login}!`,
+      });
+    }
+  }
+  for (const label of labels) {
+    const labelConfig = {
+      name: label,
+      color: Math.random().toString(16).slice(2, 8),
+    };
+    core.info(`Adding label ${label}`);
+    await addLabel(octokit, repoDeets, labelConfig, pr.number);
+  }
+  const approved = await canBeMerged(
+    octokit,
+    repoDeets,
+    pr,
+    codeowners,
+    owners,
+    changedFiles
+  );
+  if (!approved) {
+    core.setFailed(`PR cannot be merged`);
+    process.exit(1);
+  }
+
+  // Merge
+  core.info(`Merging PR`);
+  try {
+    await octokit.pulls.merge({
+      ...repoDeets,
+      pull_number: pr.number,
+      // @ts-ignore
+      merge_method: core.getInput("merge_method") || "squash",
+    });
+    await octokit.issues.createComment({
+      ...repoDeets,
+      issue_number: pr.number,
+      body: `Merged with approvals from ${Intl.ListFormat().format(
+        owners
+      )} - thanks for the contribution! :tada:`,
+    });
+  } catch (error) {
+    core.info(`Merging (or commenting) failed:`);
+    core.error(error);
+    core.setFailed("Failed to merge");
+    process.exit(1);
+  }
 }
 
 // @ts-ignore
 if (!module.parent) {
   try {
-    run()
+    run();
   } catch (error) {
-    core.setFailed(error.message)
-    throw error
+    core.setFailed(error.message);
+    throw error;
   }
 }
 
 // Bail correctly
-process.on('uncaughtException', function (err) {
-  core.setFailed(err.message)
-  console.error((new Date).toUTCString() + ' uncaughtException:', err.message)
-  console.error(err.stack)
-  process.exit(1)
-})
+process.on("uncaughtException", function (err) {
+  core.setFailed(err.message);
+  console.error(new Date().toUTCString() + " uncaughtException:", err.message);
+  console.error(err.stack);
+  process.exit(1);
+});
