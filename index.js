@@ -215,7 +215,7 @@ async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
   });
   let hasMergeCommandReview = reviewComments.find(
     (c) =>
-      c.body.includes(mergeRegex) &&
+      c.body.match(mergeRegex) &&
       c.user.login !== pr.user.login &&
       c.user.login in owners
   );
