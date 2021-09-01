@@ -13,6 +13,10 @@ const Codeowners = __nccwpck_require__(9205);
 const ourSignature = "<!-- Message About Merging -->";
 const lgtmRegex = /\/lgtm/i;
 const mergeRegex = /\/merge/i;
+const mergeReadyLabel = { name: "merge-ready", color: "00ff00" };
+const needsLgtmLabel = { name: "needs-lgtm", color: "FFA500" };
+const needsMergeLabel = { name: "needs-merge", color: "FFA500" };
+const lgtmLabel = { name: "lgtm", color: "00FFFF" };
 
 async function getChangedFiles(octokit, repoDeets, prNumber) {
   // https://developer.github.com/v3/pulls/#list-pull-requests-files
@@ -80,28 +84,29 @@ function getCodeOwnersAndLabels(changedFiles, codeowners) {
   };
 }
 
-async function addLabel(octokit, repoDeets, labelConfig, prNumber) {
+async function setLabels(octokit, repoDeets, labelConfigs, prNumber) {
   let label = null;
   const existingLabels = await octokit.paginate(
     "GET /repos/:owner/:repo/labels",
-    { owner: repoDeets.owner, repo: repoDeets.repo }
+    { ...repoDeets }
   );
-  label = existingLabels.find((l) => l.name == labelConfig.name);
-
-  // Create the label if it doesn't exist yet
-  if (!label) {
-    await octokit.issues.createLabel({
-      ...repoDeets,
-      name: labelConfig.name,
-      color: labelConfig.color,
-      description: labelConfig.description || "",
-    });
+  for (const labelConfig of labelConfigs) {
+    label = existingLabels.find((l) => l.name == labelConfig.name);
+    // Create the label if it doesn't exist yet
+    if (!label) {
+      await octokit.issues.createLabel({
+        ...repoDeets,
+        name: labelConfig.name,
+        color: labelConfig.color,
+        description: labelConfig.description || "",
+      });
+    }
   }
 
-  await octokit.issues.addLabels({
+  await octokit.issues.setLabels({
     ...repoDeets,
     issue_number: prNumber,
-    labels: [labelConfig.name],
+    labels: [labelConfigs.map((l) => l.name)],
   });
 }
 
@@ -277,8 +282,6 @@ async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
   );
   if (hasMergeCommand) {
     core.info(`Found merge comment from ${hasMergeCommand.user.login}`);
-    const labelConfig = { name: "merge-ready", color: "00ff00" };
-    await addLabel(octokit, repoDeeets, labelConfig, pr.number);
   }
 
   const { data: reviewComments } = await octokit.pulls.listReviews({
@@ -295,7 +298,7 @@ async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
   return hasMergeCommand;
 }
 
-async function canBeMerged(
+async function isApproved(
   octokit,
   repoDeeets,
   pr,
@@ -323,8 +326,6 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
   const approvers = await getApprovers(octokit, repoDeeets, pr, approverOwners);
   if (approvers.length === 0) {
     core.info(`Missing approvals for PR. Potential owners: ${approverOwners}`);
-    const labelConfig = { name: "needs-lgtm", color: "FFA500" };
-    await addLabel(octokit, repoDeeets, labelConfig, pr.number);
     return false;
   }
 
@@ -352,8 +353,6 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
         missingOwners
       )}`
     );
-    const labelConfig = { name: "needs-lgtm", color: "FFA500" };
-    await addLabel(octokit, repoDeeets, labelConfig, pr.number);
     return false;
   }
   if (changedFilesNotApproved.length > 0 && missingOwners.length === 0) {
@@ -361,18 +360,7 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
       `Files without explicit ownership: ${changedFilesNotApproved}. Continuing merge since we assume this is okay!`
     );
   }
-  const labelConfig = { name: "lgtm", color: "00FFFF" };
-  await addLabel(octokit, repoDeeets, labelConfig, pr.number);
-  if (!(await hasMergeCommand(octokit, repoDeeets, pr, approverOwners))) {
-    core.info(`Missing /merge command by an owner: ${approverOwners}`);
-    const labelConfig = { name: "no-merge", color: "808080" };
-    await addLabel(octokit, repoDeeets, labelConfig, pr.number);
-    return false;
-  }
-  if (!(await isCheckSuiteGreen(octokit, repoDeeets, pr))) {
-    core.info("Check suite not green");
-    return false;
-  }
+
   return approvers;
 }
 
@@ -394,6 +382,7 @@ async function run() {
   const pr = context.payload.pull_request || context.payload.issue;
   const repoDeets = { owner: context.repo.owner, repo: context.repo.repo };
   const changedFiles = await getChangedFiles(octokit, repoDeets, pr.number);
+  let labelConfigs = [];
   core.info(`Changed files: ${new Intl.ListFormat().format(changedFiles)}`);
   const { users: owners, labels: labels } = await getCodeOwnersAndLabels(
     changedFiles,
@@ -457,7 +446,7 @@ Owners will be reviewing this PR. No automatic reviewer could be found.`;
       color: Math.random().toString(16).slice(2, 8),
     };
     core.info(`Adding label ${label}`);
-    await addLabel(octokit, repoDeets, labelConfig, pr.number);
+    labelConfigs.push(labelConfig);
   }
   if (owners.length === 0) {
     core.info(
@@ -472,7 +461,7 @@ Owners will be reviewing this PR. No automatic reviewer could be found.`;
     process.exit(0);
   }
 
-  const approved = await canBeMerged(
+  const approved = await isApproved(
     octokit,
     repoDeets,
     pr,
@@ -481,7 +470,26 @@ Owners will be reviewing this PR. No automatic reviewer could be found.`;
     changedFiles
   );
   if (!approved) {
+    labelConfigs.push(needsLgtmLabel);
     core.setFailed(`PR cannot be merged`);
+    await setLabels(octokit, repoDeets, pr.number, labelConfigs);
+    process.exit(1);
+  }
+  labelConfigs.push(lgtmLabel);
+  if (!(await hasMergeCommand(octokit, repoDeets, pr, owners))) {
+    labelConfigs.push(needsMergeLabel);
+    core.info(
+      `Missing /merge command by an owner: ${new Intl.ListFormat().format(
+        owners
+      )}`
+    );
+    await setLabels(octokit, repoDeets, pr.number, labelConfigs);
+    process.exit(1);
+  }
+  labelConfigs.push(mergeReadyLabel);
+  if (!(await isCheckSuiteGreen(octokit, repoDeets, pr))) {
+    core.info("Check suite not green");
+    await setLabels(octokit, repoDeets, pr.number, labelConfigs);
     process.exit(1);
   }
 
