@@ -279,12 +279,12 @@ async function canBeMerged(
   let changedFilesNotApproved = changedFiles;
   const approverOwners = owners.filter((o) => o !== "@" + pr.user.login);
   if (!(await hasMergeCommand(octokit, repoDeeets, pr, approverOwners))) {
-    core.info("Missing /merge command by an owner: ");
+    core.info(`Missing /merge command by an owner: ${approverOwners}`);
     return false;
   }
   const approvers = await getApprovers(octokit, repoDeeets, pr, approverOwners);
   if (approvers.length < 1) {
-    core.info("Missing approvals for PR");
+  core.info(`Missing approvals for PR. Potential owners: ${approverOwners}`);
     return false;
   }
 
