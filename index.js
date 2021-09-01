@@ -244,11 +244,13 @@ async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
     issue_number: pr.number,
   });
   let hasMergeCommand = comments.data.find(
-    (c) => c.body.match(mergeRegex) && (!owners || owners.includes("@" + c.user.login))
+    (c) =>
+      c.body.match(mergeRegex) &&
+      (!owners || owners.includes("@" + c.user.login))
   );
   if (hasMergeCommand) {
     core.info(`Found merge comment from ${hasMergeCommand.user.login}`);
-    const labelConfig = {name: "merge-ready", color: "00ff00"};
+    const labelConfig = { name: "merge-ready", color: "00ff00" };
     await addLabel(octokit, repoDeeets, labelConfig, pr.number);
   }
 
@@ -257,7 +259,9 @@ async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
     pull_number: pr.number,
   });
   const hasMergeCommandReview = reviewComments.find(
-    (c) => c.body.match(mergeRegex) && (!owners || owners.includes("@" + c.user.login))
+    (c) =>
+      c.body.match(mergeRegex) &&
+      (!owners || owners.includes("@" + c.user.login))
   );
   if (hasMergeCommandReview) {
     core.info(`Found merge review from ${hasMergeCommandReview.user.login}`);
@@ -267,14 +271,17 @@ async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
 }
 
 async function updateWelcomeComment(octokit, repoDeets, prNumber, message) {
-  const welcomeComment = await hasPRWelcomeMessage(octokit, repoDeets, prNumber);
-  if (welcomeComment) {
-    octokit.issues.updateComment({
-      ...repoDeets,
-      comment_id: welcomeComment.id,
-      body: message,
-    });
-  }
+  const welcomeComment = await hasPRWelcomeMessage(
+    octokit,
+    repoDeets,
+    prNumber
+  );
+
+  octokit.issues.updateComment({
+    ...repoDeets,
+    comment_id: welcomeComment.id,
+    body: message,
+  });
 }
 
 async function canBeMerged(
@@ -288,26 +295,39 @@ async function canBeMerged(
   let changedFilesNotApproved = changedFiles;
   const approverOwners = owners.filter((o) => o !== "@" + pr.user.login);
   if (owners.length === 0) {
-    core.info("No owners for changes found. No automatic merge is possible. Consider adding root owners!");
-    await updateWelcomeComment(octokit,repoDeeets, pr.number, `Thanks for the PR! 🚀
+    core.info(
+      "No owners for changes found. No automatic merge is possible. Consider adding root owners!"
+    );
+    await updateWelcomeComment(
+      octokit,
+      repoDeeets,
+      pr.number,
+      `Thanks for the PR! 🚀
 
-No owners for changes found. No automatic merge is possible.`)
+No owners for changes found. No automatic merge is possible.`
+    );
     process.exit(0);
   }
   if (approverOwners.length === 0) {
-    core.info("Seems PR user is only owner. Will accept anyone to merge or approve.");
-    await updateWelcomeComment(octokit,repoDeeets, pr.number, `Thanks for the PR! 🚀
+    core.info(
+      "Seems PR user is only owner. Will accept anyone to merge or approve."
+    );
+    await updateWelcomeComment(
+      octokit,
+      repoDeeets,
+      pr.number,
+      `Thanks for the PR! 🚀
 
-Seems ${pr.user.login} is only owner for changes. Any user can use \`/merge\` or \`/lgtm\` to merge or approve.`) 
+Seems ${pr.user.login} is only owner for changes. Any user can use \`/merge\` or \`/lgtm\` to merge or approve.`
+    );
   }
   const approvers = await getApprovers(octokit, repoDeeets, pr, approverOwners);
   if (approvers.length === 0) {
     core.info(`Missing approvals for PR. Potential owners: ${approverOwners}`);
-    const labelConfig = {name: "needs-lgtm", color: "FFA500"};
+    const labelConfig = { name: "needs-lgtm", color: "FFA500" };
     await addLabel(octokit, repoDeeets, labelConfig, pr.number);
     return false;
   }
-
 
   approvers.forEach((approver) => {
     changedFilesNotApproved = getFilesNotOwnedByCodeOwner(
@@ -333,7 +353,7 @@ Seems ${pr.user.login} is only owner for changes. Any user can use \`/merge\` or
         missingOwners
       )}`
     );
-    const labelConfig = {name: "needs-lgtm", color: "FFA500"};
+    const labelConfig = { name: "needs-lgtm", color: "FFA500" };
     await addLabel(octokit, repoDeeets, labelConfig, pr.number);
     return false;
   }
@@ -342,11 +362,11 @@ Seems ${pr.user.login} is only owner for changes. Any user can use \`/merge\` or
       `Files without explicit ownership: ${changedFilesNotApproved}. Continuing merge since we assume this is okay!`
     );
   }
-  const labelConfig = {name: "lgtm", color: "00FFFF"};
+  const labelConfig = { name: "lgtm", color: "00FFFF" };
   await addLabel(octokit, repoDeeets, labelConfig, pr.number);
   if (!(await hasMergeCommand(octokit, repoDeeets, pr, approverOwners))) {
     core.info(`Missing /merge command by an owner: ${approverOwners}`);
-    const labelConfig = {name: "no-merge", color: "808080"};
+    const labelConfig = { name: "no-merge", color: "808080" };
     await addLabel(octokit, repoDeeets, labelConfig, pr.number);
     return false;
   }
