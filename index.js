@@ -215,7 +215,7 @@ async function getApprovers(octokit, repoDeets, pr, owners) {
   comments.forEach((comment) => {
     if (
       comment.body.match(lgtmRegex) &&
-      owners.include('@' + comment.user.login) &&
+      owners.include("@" + comment.user.login) &&
       !comment.body.includes(ourSignature)
     ) {
       core.info(`Found lgtm comment from ${comment.user.login}`);
@@ -229,7 +229,7 @@ async function getApprovers(octokit, repoDeets, pr, owners) {
   reviewComments.forEach((comment) => {
     if (
       (comment.state === "APPROVED" || comment.body.match(lgtmRegex)) &&
-      owners.include('@' + comment.user.login) &&
+      owners.include("@" + comment.user.login) &&
       !comment.body.includes(ourSignature)
     )
       core.info(`Found lgtm comment from ${comment.user.login}`);
@@ -244,9 +244,7 @@ async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
     issue_number: pr.number,
   });
   let hasMergeCommand = comments.data.find(
-    (c) =>
-      c.body.match(mergeRegex) &&
-      owners.includes("@" + c.user.login)
+    (c) => c.body.match(mergeRegex) && owners.includes("@" + c.user.login)
   );
   if (hasMergeCommand) {
     core.info(`Found lgtm comment from ${hasMergeCommand.user.login}`);
@@ -257,9 +255,7 @@ async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
     pull_number: pr.number,
   });
   const hasMergeCommandReview = reviewComments.find(
-    (c) =>
-      c.body.match(mergeRegex) &&
-      owners.includes("@" + c.user.login)
+    (c) => c.body.match(mergeRegex) && owners.includes("@" + c.user.login)
   );
   if (hasMergeCommandReview) {
     core.info(`Found lgtm review from ${hasMergeCommandReview.user.login}`);
@@ -278,13 +274,17 @@ async function canBeMerged(
 ) {
   let changedFilesNotApproved = changedFiles;
   const approverOwners = owners.filter((o) => o !== "@" + pr.user.login);
+  if (approverOwners.length === 0) {
+    core.info("No approvers found. No automatic merge is possible. Consider adding root owners!");
+    process.exit(0);
+  }
   if (!(await hasMergeCommand(octokit, repoDeeets, pr, approverOwners))) {
     core.info(`Missing /merge command by an owner: ${approverOwners}`);
     return false;
   }
   const approvers = await getApprovers(octokit, repoDeeets, pr, approverOwners);
   if (approvers.length < 1) {
-  core.info(`Missing approvals for PR. Potential owners: ${approverOwners}`);
+    core.info(`Missing approvals for PR. Potential owners: ${approverOwners}`);
     return false;
   }
 
