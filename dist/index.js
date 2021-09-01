@@ -106,7 +106,7 @@ async function setLabels(octokit, repoDeets, labelConfigs, prNumber) {
   await octokit.issues.setLabels({
     ...repoDeets,
     issue_number: prNumber,
-    labels: [labelConfigs.map((l) => l.name)],
+    labels: labelConfigs.map((l) => l.name),
   });
 }
 
