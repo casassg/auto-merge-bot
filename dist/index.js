@@ -472,7 +472,7 @@ Owners will be reviewing this PR. No automatic reviewer could be found.`;
   if (!approved) {
     labelConfigs.push(needsLgtmLabel);
     core.setFailed(`PR cannot be merged`);
-    await setLabels(octokit, repoDeets, pr.number, labelConfigs);
+    await setLabels(octokit, repoDeets, labelConfigs, pr.number);
     process.exit(1);
   }
   labelConfigs.push(lgtmLabel);
@@ -483,13 +483,13 @@ Owners will be reviewing this PR. No automatic reviewer could be found.`;
         owners
       )}`
     );
-    await setLabels(octokit, repoDeets, pr.number, labelConfigs);
+    await setLabels(octokit, repoDeets, labelConfigs, pr.number);
     process.exit(1);
   }
   labelConfigs.push(mergeReadyLabel);
   if (!(await isCheckSuiteGreen(octokit, repoDeets, pr))) {
     core.info("Check suite not green");
-    await setLabels(octokit, repoDeets, pr.number, labelConfigs);
+    await setLabels(octokit, repoDeets, labelConfigs, pr.number);
     process.exit(1);
   }
 
