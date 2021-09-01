@@ -1,6 +1,6 @@
-name: 'Code Owner Self Merge'
-description: 'Lets the CODEOWNERS file determine who can merge a PR'
-author: 'Orta Therox'
+name: 'Auto Merge Bot'
+description: 'Automatically merge PRs from GitHub'
+author: 'Gerard Casas Saez'
 
 branding:
   icon: git-merge
@@ -17,16 +17,7 @@ inputs:
     default: 'merge'
     required: false
 
-  if_no_maintainers_add_label:
-    description: "If a PR does not have any community maintainers, apply this label"
-    default: ''
-    required: false
-    
-  if_no_maintainers_assign:
-    description: 'If a PR does not have any community maintainers, assign these people (e.g. "@orta @sandersn")'
-    default: ''
-    required: false
-
 runs:
   using: 'node12'
+  pre: 'yarn install'
   main: 'index.js'
