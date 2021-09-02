@@ -146,9 +146,7 @@ async function isCheckSuiteGreen(octokit, repoDeeets, pr) {
     );
     // if failed, returne false
     if (failedRun) {
-      core.info(
-        `Check suite status: ${failedRun.status} (${failedRun.name})`
-      );
+      core.info(`Check suite status: ${failedRun.status} (${failedRun.name})`);
       return false;
     }
     // if no in progress, then we are good to go!
