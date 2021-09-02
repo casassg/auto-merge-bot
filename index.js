@@ -133,6 +133,7 @@ async function isCheckSuiteGreen(octokit, repoDeeets, pr) {
       ...repoDeeets,
       ref: `pull/${pr.number}/head`,
     });
+    console.log(JSON.stringify(checkSuites.data));
     // Check if there's a run in progress or failed
     inprogressRun = checkSuites.data.check_runs.find(
       (s) => s.status === "in_progress" && s.name !== process.env.GITHUB_JOB
