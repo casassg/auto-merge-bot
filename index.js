@@ -133,7 +133,6 @@ async function isCheckSuiteGreen(octokit, repoDeeets, pr) {
       ...repoDeeets,
       ref: `pull/${pr.number}/head`,
     });
-    core.info(JSON.stringify(checkSuites.data));
     // Check if there's a run in progress or failed
     inprogressRun = checkSuites.data.check_runs.find(
       (s) => s.status === "in_progress" && s.name !== process.env.GITHUB_JOB
@@ -146,7 +145,9 @@ async function isCheckSuiteGreen(octokit, repoDeeets, pr) {
     );
     // if failed, returne false
     if (failedRun) {
-      core.info(`Check suite status: ${failedRun.status} (${failedRun.name})`);
+      core.info(
+        `Check suite status: ${failedRun.status} - Conclusion: ${failedRun.conclusion} (${failedRun.name})`
+      );
       return false;
     }
     // if no in progress, then we are good to go!
@@ -156,7 +157,7 @@ async function isCheckSuiteGreen(octokit, repoDeeets, pr) {
     // Wait for a bit before checking again.
     else {
       core.info(
-        `Check suite status: ${inprogressRun.status} (${inprogressRun.name})`
+        `Check suite status: ${inprogressRun.status} - Conclusion: ${inprogressRun.conclusion} (${inprogressRun.name})`
       );
       core.info("Sleeping for 5000 ms");
       await new Promise((r) => setTimeout(r, 5000));
