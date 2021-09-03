@@ -16,6 +16,7 @@ const mergeRegex = /\/merge/i;
 const mergeReadyLabel = { name: "merge-ready", color: "00ff00" };
 const needsLgtmLabel = { name: "needs-lgtm", color: "FFA500" };
 const needsMergeLabel = { name: "needs-merge", color: "FFA500" };
+const needsManualMergeLabel = { name: "needs-manual-merge", color: "FFA500" };
 const lgtmLabel = { name: "lgtm", color: "00FFFF" };
 const ownersWillReviewMessage = `Thanks for the PR!  :rocket:
 
@@ -383,6 +384,7 @@ async function run() {
   const codeowners = new Codeowners(core.getInput("cwd") || process.cwd());
   const octokit = getOctokit(process.env.GITHUB_TOKEN);
   const pr = context.payload.pull_request || context.payload.issue;
+  core.info(JSON.stringify(pr));
   const repoDeets = { owner: context.repo.owner, repo: context.repo.repo };
   const changedFiles = await getChangedFiles(octokit, repoDeets, pr.number);
   let labelConfigs = [];
@@ -534,6 +536,16 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
       )} - thanks for the contribution! :tada:`,
     });
   } catch (error) {
+    for (const changedFile of changedFiles) {
+      if (changedFile.includes(".github/workflows")) {
+        core.info(
+          `Automerge is not available for PRs modifying GitHub Actions. See https://github.com/casassg/auto-merge-bot/issues/1`
+        );
+        labelConfigs.push(needsManualMergeLabel);
+        await setLabels(octokit, repoDeets, labelConfigs, pr.number);
+        process.exit(0);
+      }
+    }
     core.info(`Merging (or commenting) failed:`);
     core.error(error);
     core.setFailed("Failed to merge");
