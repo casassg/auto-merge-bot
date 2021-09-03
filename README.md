@@ -8,7 +8,7 @@ Heavily inpired by functionality from [prow-bot](https://github.com/kubernetes/t
 ## Known Limitations
 
 - PRs from forks modifying `.github/workflows` are not supported. [casassg/auto-merge-bot#1](https://github.com/casassg/auto-merge-bot/issues/1)
-- PR review comments for forks are not supported. [casassg/auto-merge-bot#3](https://github.com/casassg/auto-merge-bot/issues/3)
+- PR review comments for forks are not supported and actively discouraged to use. Use comments instead. [casassg/auto-merge-bot#3](https://github.com/casassg/auto-merge-bot/issues/3)
 
 ## Code ownership
 
@@ -70,6 +70,8 @@ Then you should be good to go.
 ### Security
 
 Using [`pull_request_target`](https://github.blog/2020-08-03-github-actions-improvements-for-fork-and-pull-request-workflows/) and `issue_comment` as a workflow event to ensure that someone cannot change the CODEOWNER files at the same time as having that change be used to validate if they can merge.
+
+Adding this action to a workflow with `pull_request` or `pull_request_review` as a workflow event will ensure that someone cannot change the CODEOWNER files at the same time as having that change be used to validate if they can merge. In addition, it will fail to have the right permissions when a fork is used to perform the PR.
 
 ## Config
 
