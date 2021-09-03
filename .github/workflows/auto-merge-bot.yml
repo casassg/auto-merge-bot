@@ -13,4 +13,4 @@ jobs:
       - name: Run Codeowners merge check
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        uses: .
+        uses: ./
