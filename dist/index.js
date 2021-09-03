@@ -125,11 +125,16 @@ async function setLabels(octokit, repoDeets, labelConfigs, prNumber) {
   }
   const labels = labelConfigs.map((l) => l.name);
   core.info(`Setting labels: ${formatArray(labels)}`);
-  await octokit.issues.setLabels({
-    ...repoDeets,
-    issue_number: prNumber,
-    labels: labels,
-  });
+  try {
+    await octokit.issues.setLabels({
+      ...repoDeets,
+      issue_number: prNumber,
+      labels: labels,
+    });
+  } catch (e) {
+    core.error(e);
+    core.info("Skipping to set labels");
+  }
 }
 
 async function isCheckSuiteGreen(octokit, repoDeeets, pr) {
@@ -385,7 +390,7 @@ async function run() {
   const octokit = getOctokit(process.env.GITHUB_TOKEN);
   const pr = context.payload.pull_request || context.payload.issue;
   const repoDeets = { owner: context.repo.owner, repo: context.repo.repo };
-  
+
   // validate PR
   try {
     await octokit.pulls.get({
