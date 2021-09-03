@@ -12,7 +12,9 @@ const needsMergeLabel = { name: "needs-merge", color: "FFA500" };
 const lgtmLabel = { name: "lgtm", color: "00FFFF" };
 const ownersWillReviewMessage = `Thanks for the PR!  :rocket:
 
-Owners will be reviewing this PR.`;
+_Instructions:_ Approve using \`/lgtm\` and mark for automatic merge by using \`/merge\`.
+
+_Note:_`;
 async function getChangedFiles(octokit, repoDeets, prNumber) {
   // https://developer.github.com/v3/pulls/#list-pull-requests-files
   const options = octokit.pulls.listFiles.endpoint.merge({
@@ -399,16 +401,15 @@ async function run() {
         const assignee = await assignReviewer(octokit, owners, repoDeets, pr);
         core.info(`Assigned reviewer: ${assignee}. Sending welcome message!`);
         if (assignee) {
-          message = `${ownersWillReviewMessage}. Assigned reviewer: ${assignee}
-    
-  Approve using \`/lgtm\` and mark for automatic merge by using \`/merge\`.`;
+          message = `${ownersWillReviewMessage} Assigned reviewer: ${assignee}`;
         } else {
-          message = `${ownersWillReviewMessage}. No automatic reviewer could be found.`;
+          message = `${ownersWillReviewMessage} No automatic reviewer could be found.`;
         }
       } else {
         core.info("Skipping reviewer assignation");
         message = ownersWillReviewMessage;
       }
+
       await welcomeMessage(octokit, repoDeets, pr.number, message);
     }
   } else {
