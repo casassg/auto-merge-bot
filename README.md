@@ -52,14 +52,13 @@ name: Codeowners merging
 on:
   pull_request_target: { types: [opened, synchronize] }
   issue_comment: { types: [created] }
-  pull_request_review: { types: [submitted] }
 
 jobs:
   auto-merge-bot:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v0.1
+      - uses: actions/checkout@v0.3
       - name: Run Codeowners merge check
         uses: casassg/auto-merge-bot@master
         env:
@@ -70,7 +69,7 @@ Then you should be good to go.
 
 ### Security
 
-Use [`pull_request_target`](https://github.blog/2020-08-03-github-actions-improvements-for-fork-and-pull-request-workflows/) as a workflow event to ensure that someone cannot change the CODEOWNER files at the same time as having that change be used to validate if they can merge.
+Using [`pull_request_target`](https://github.blog/2020-08-03-github-actions-improvements-for-fork-and-pull-request-workflows/) and `issue_comment` as a workflow event to ensure that someone cannot change the CODEOWNER files at the same time as having that change be used to validate if they can merge.
 
 ## Config
 
@@ -82,7 +81,7 @@ There are four options available at the moment:
 
 ```yml
 - name: Run Codeowners merge check
-  uses: casassg/auto-merge-bot@v0.1
+  uses: casassg/auto-merge-bot@v0.3
   env:
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   with:
