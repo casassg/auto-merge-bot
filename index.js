@@ -540,7 +540,7 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
       ...repoDeets,
       issue_number: pr.number,
       body: `Merged with approvals from ${formatArray(
-        approved
+        Array.from(new Set(approved))
       )} - thanks for the contribution! :tada:`,
     });
   } catch (error) {
