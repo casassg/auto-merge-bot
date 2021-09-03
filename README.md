@@ -93,6 +93,7 @@ There are four options available at the moment:
 
 - `cwd`, which can be used to determine the root folder to look for CODEOWNER files in.
 - `merge_method`, which can be `merge`, `squash` (default) or `rebase`, depending on what you want the action to do.
+- `assign_reviewer`, which can be `true` or `false`, depending on whether you want the bot to assign the reviewer to the pull request.
 
 ```yml
 - name: Run Codeowners merge check
