@@ -14,7 +14,7 @@ const ownersWillReviewMessage = `Thanks for the PR!  :rocket:
 
 _Instructions:_ Approve using \`/lgtm\` and mark for automatic merge by using \`/merge\`.
 
-_Note:_`;
+<!-- Base message -->`;
 async function getChangedFiles(octokit, repoDeets, prNumber) {
   // https://developer.github.com/v3/pulls/#list-pull-requests-files
   const options = octokit.pulls.listFiles.endpoint.merge({
