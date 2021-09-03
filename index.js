@@ -11,6 +11,13 @@ const needsLgtmLabel = { name: "needs-lgtm", color: "FFA500" };
 const needsMergeLabel = { name: "needs-merge", color: "FFA500" };
 const needsManualMergeLabel = { name: "needs-manual-merge", color: "FFA500" };
 const lgtmLabel = { name: "lgtm", color: "00FFFF" };
+const allLabels = [
+  mergeReadyLabel,
+  needsLgtmLabel,
+  needsManualMergeLabel,
+  lgtmLabel,
+  needsMergeLabel,
+];
 const ownersWillReviewMessage = `Thanks for the PR!  :rocket:
 
 _Instructions:_ Approve using \`/lgtm\` and mark for automatic merge by using \`/merge\`.
@@ -118,12 +125,26 @@ async function setLabels(octokit, repoDeets, labelConfigs, prNumber) {
   }
   const labels = labelConfigs.map((l) => l.name);
   core.info(`Setting labels: ${formatArray(labels)}`);
-
-  await octokit.issues.setLabels({
+  await octokit.issues.addLabels({
     ...repoDeets,
     issue_number: prNumber,
     labels: labels,
   });
+  const removingLabels = allLabels
+    .filter((l) => !labelConfigs.includes(l))
+    .map((l) => l.name);
+  for (const removingLabel of removingLabels) {
+    core.info(`Removing label: ${removingLabel}`);
+    try {
+      await octokit.issues.removeLabel({
+        ...repoDeets,
+        issue_number: prNumber,
+        name: removingLabel,
+      });
+    } catch (e) {
+      core.info(`Failed to remove label ${removingLabel}`);
+    }
+  }
 }
 
 async function isCheckSuiteGreen(octokit, repoDeeets, pr) {
