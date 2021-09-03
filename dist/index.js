@@ -384,10 +384,11 @@ async function run() {
   const codeowners = new Codeowners(core.getInput("cwd") || process.cwd());
   const octokit = getOctokit(process.env.GITHUB_TOKEN);
   const pr = context.payload.pull_request || context.payload.issue;
-  core.info(JSON.stringify(pr));
   const repoDeets = { owner: context.repo.owner, repo: context.repo.repo };
+  
+  // validate PR
   try {
-    await octokit.rest.pulls.get({
+    await octokit.pulls.get({
       ...repoDeets,
       pull_number: pr.number,
     });
