@@ -22,6 +22,11 @@ const ownersWillReviewMessage = `Thanks for the PR!  :rocket:
 _Instructions:_ Approve using \`/lgtm\` and mark for automatic merge by using \`/merge\`.
 
 <!-- Base message -->`;
+
+function formatArray(arr) {
+  return new Intl.ListFormat().format(arr);
+}
+
 async function getChangedFiles(octokit, repoDeets, prNumber) {
   // https://developer.github.com/v3/pulls/#list-pull-requests-files
   const options = octokit.pulls.listFiles.endpoint.merge({
@@ -83,27 +88,20 @@ function isCommentValid(
   );
 }
 
-function getCodeOwnersAndLabels(changedFiles, codeowners) {
+function getCodeOwners(changedFiles, codeowners) {
   const owners = new Set();
-  const labels = new Set();
 
   for (const file of changedFiles) {
     const relative = file.startsWith("/") ? file.slice(1) : file;
     const fileOwners = codeowners.getOwner(relative);
     fileOwners.forEach((o) => {
       if (o.startsWith("@")) owners.add(o);
-      if (o.startsWith("[")) labels.add(o.slice(1, o.length - 1));
     });
   }
   core.info(
-    `Found ${new Intl.ListFormat().format(
-      owners
-    )} owners and ${new Intl.ListFormat().format(labels)} labels`
+    `Found ${formatArray(owners)} as owners of ${formatArray(changedFiles)}`
   );
-  return {
-    users: Array.from(owners),
-    labels: Array.from(labels),
-  };
+  return Array.from(owners);
 }
 
 async function setLabels(octokit, repoDeets, labelConfigs, prNumber) {
@@ -125,7 +123,7 @@ async function setLabels(octokit, repoDeets, labelConfigs, prNumber) {
     }
   }
   const labels = labelConfigs.map((l) => l.name);
-  core.info(`Setting labels: ${new Intl.ListFormat().format(labels)}`);
+  core.info(`Setting labels: ${formatArray(labels)}`);
   await octokit.issues.setLabels({
     ...repoDeets,
     issue_number: prNumber,
@@ -332,9 +330,7 @@ async function isApproved(
   const approvers = await getApprovers(octokit, repoDeeets, pr, owners);
   if (approvers.length === 0) {
     core.info(
-      `Missing approvals for PR. Potential owners: ${new Intl.ListFormat().format(
-        owners
-      )}`
+      `Missing approvals for PR. Potential owners: ${formatArray(owners)}`
     );
     return false;
   }
@@ -353,13 +349,10 @@ async function isApproved(
     codeowners
   );
 
-  let { users: missingOwners } = getCodeOwnersAndLabels(
-    changedFilesNotApproved,
-    codeowners
-  );
+  let missingOwners = getCodeOwners(changedFilesNotApproved, codeowners);
   if (missingOwners.length > 0 && changedFilesNotApproved.length > 0) {
     core.info(
-      `Missing files to be approved: ${changedFilesNotApproved}. Potential owners: ${new Intl.ListFormat().format(
+      `Missing files to be approved: ${changedFilesNotApproved}. Potential owners: ${formatArray(
         missingOwners
       )}`
     );
@@ -393,11 +386,8 @@ async function run() {
   const repoDeets = { owner: context.repo.owner, repo: context.repo.repo };
   const changedFiles = await getChangedFiles(octokit, repoDeets, pr.number);
   let labelConfigs = [];
-  core.info(`Changed files: ${new Intl.ListFormat().format(changedFiles)}`);
-  const { users: owners, labels: labels } = await getCodeOwnersAndLabels(
-    changedFiles,
-    codeowners
-  );
+  core.info(`Changed files: ${formatArray(changedFiles)}`);
+  const owners = await getCodeOwners(changedFiles, codeowners);
   let commentMessage = "";
   if (context.eventName === "pull_request_target") {
     if (await hasPRWelcomeMessage(octokit, repoDeets, pr.number)) {
@@ -438,14 +428,6 @@ async function run() {
     } else if (isMergeComment) {
       commentMessage = `Merge request received from @${sender}! :white_check_mark:`;
     }
-  }
-  for (const label of labels) {
-    const labelConfig = {
-      name: label,
-      color: Math.random().toString(16).slice(2, 8),
-    };
-    core.info(`Adding label ${label}`);
-    labelConfigs.push(labelConfig);
   }
   if (owners.length === 0) {
     core.info(
@@ -509,9 +491,7 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
   if (!(await hasMergeCommand(octokit, repoDeets, pr, approverOwners))) {
     labelConfigs.push(needsMergeLabel);
     core.info(
-      `Missing /merge command by an owner: ${new Intl.ListFormat().format(
-        approverOwners
-      )}`
+      `Missing /merge command by an owner: ${formatArray(approverOwners)}`
     );
     await sendCommentUpdate(
       octokit,
@@ -549,7 +529,7 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
     await octokit.issues.createComment({
       ...repoDeets,
       issue_number: pr.number,
-      body: `Merged with approvals from ${new Intl.ListFormat().format(
+      body: `Merged with approvals from ${formatArray(
         approved
       )} - thanks for the contribution! :tada:`,
     });
