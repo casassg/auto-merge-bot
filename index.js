@@ -394,15 +394,20 @@ async function run() {
     if (await hasPRWelcomeMessage(octokit, repoDeets, pr.number)) {
       core.info(`PR already welcomed`);
     } else {
-      const assignee = await assignReviewer(octokit, owners, repoDeets, pr);
-      core.info(`Assigned reviewer: ${assignee}. Sending welcome message!`);
       let message = "";
-      if (assignee) {
-        message = `${ownersWillReviewMessage}. Assigned reviewer: ${assignee}
-  
-Approve using \`/lgtm\` and mark for automatic merge by using \`/merge\`.`;
+      if (core.getInput("assign_reviewer") === "true") {
+        const assignee = await assignReviewer(octokit, owners, repoDeets, pr);
+        core.info(`Assigned reviewer: ${assignee}. Sending welcome message!`);
+        if (assignee) {
+          message = `${ownersWillReviewMessage}. Assigned reviewer: ${assignee}
+    
+  Approve using \`/lgtm\` and mark for automatic merge by using \`/merge\`.`;
+        } else {
+          message = `${ownersWillReviewMessage}. No automatic reviewer could be found.`;
+        }
       } else {
-        message = `${ownersWillReviewMessage}. No automatic reviewer could be found.`;
+        core.info("Skipping reviewer assignation");
+        message = ownersWillReviewMessage;
       }
       await welcomeMessage(octokit, repoDeets, pr.number, message);
     }

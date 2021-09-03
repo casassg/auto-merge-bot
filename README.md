@@ -5,6 +5,13 @@ A GitHub action to manage pull requests automatically via comments from CODEOWNE
 Heavily inpired by functionality from [prow-bot](https://github.com/kubernetes/test-infra/tree/master/prow) and based on the exiting GitHub action
 [OSS-Docs-Tools/code-owner-self-merge](https://github.com/OSS-Docs-Tools/code-owner-self-merge).
 
+## Known Issues
+
+GitHub Actions does not support automatic merging of pull requests that modify any workflows from a workflow. 
+So any modifications to workflows will not be merged automatically by this bot.
+
+See related [discussion](https://github.community/t/github-action-resource-not-accessible-by-integration/16034)
+
 ## Code ownership
 
 This action uses the standardized structure of [a CODEOWNERS file](https://github.blog/2017-07-06-introducing-code-owners/) to handle the access controls.

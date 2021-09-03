@@ -14,7 +14,11 @@ inputs:
 
   merge_method:
     description: "The merge strategy to use: 'merge', 'squash' or 'rebase'"
-    default: "merge"
+    default: "squash"
+    required: false
+  assign_reviewer:
+    description: "Wether to assign or not a reviewer"
+    default: "true"
     required: false
 
 runs:
