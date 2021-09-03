@@ -386,17 +386,16 @@ async function run() {
   const pr = context.payload.pull_request || context.payload.issue;
   core.info(JSON.stringify(pr));
   const repoDeets = { owner: context.repo.owner, repo: context.repo.repo };
-  try{
-    const { data: pullRequest } = await octokit.rest.pulls.get({
+  try {
+    await octokit.rest.pulls.get({
       ...repoDeets,
       pull_number: pr.number,
     });
-    if (!pullRequest) {
-      core.info('Pull request not found')
-      return;
-    }
   } catch (error) {
-    core.info('Error trying to find pull request')
+    core.error(error);
+    core.info(
+      "Error trying to find pull request. Could be invoke from an issue instead. Exiting safely"
+    );
     return;
   }
 
