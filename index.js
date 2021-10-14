@@ -398,21 +398,21 @@ async function run() {
   // Setup
   const codeowners = new Codeowners(core.getInput("cwd") || process.cwd());
   const octokit = getOctokit(process.env.GITHUB_TOKEN);
-  const pr = context.payload.pull_request || context.payload.issue;
+  let pr = context.payload.pull_request;
   const repoDeets = { owner: context.repo.owner, repo: context.repo.repo };
-
-  // validate PR
-  try {
-    await octokit.pulls.get({
-      ...repoDeets,
-      pull_number: pr.number,
-    });
-  } catch (error) {
-    core.error(error);
-    core.info(
-      "Error trying to find pull request. Could be invoke from an issue instead. Exiting safely"
-    );
-    return;
+  if (context.payload.issue){
+    try {
+      ({ data: pr } = await octokit.pulls.get({
+        ...repoDeets,
+        pull_number: context.payload.issue.number,
+      }));
+    } catch (error) {
+      core.error(error);
+      core.info(
+        "Error trying to find pull request. Could be invoke from an issue instead. Exiting safely"
+      );
+      return;
+    }
   }
 
   const changedFiles = await getChangedFiles(octokit, repoDeets, pr.number);
