@@ -2,6 +2,7 @@
 
 const { context, getOctokit } = require("@actions/github");
 const core = require("@actions/core");
+const fs = require("fs");
 const Codeowners = require("codeowners");
 const ourSignature = "<!-- Message About Merging -->";
 const lgtmRegex = /\/lgtm/i;
@@ -393,14 +394,28 @@ function getPayloadBody() {
   return body;
 }
 
+async function fetchCodeOwners(ocktokit, repoDeets, pr) {
+  const cwd = core.getInput("cwd") || ".";
+  const response = await ocktokit.rest.repos.getContent({
+    ...repoDeets,
+    path: cwd + "/CODEOWNERS",
+    ref: pr.base.sha,
+  });
+
+  const buff = Buffer.from(
+    response.data.content,
+    response.data.encoding
+  ).toString();
+  fs.writeFileSync(process.cwd() + "/CODEOWNERS", buff);
+}
+
 // Effectively the main function
 async function run() {
   // Setup
-  const codeowners = new Codeowners(core.getInput("cwd") || process.cwd());
   const octokit = getOctokit(process.env.GITHUB_TOKEN);
   let prContext = context.payload.pull_request;
   const repoDeets = { owner: context.repo.owner, repo: context.repo.repo };
-  if (context.payload.issue){
+  if (context.payload.issue) {
     try {
       ({ data: prContext } = await octokit.pulls.get({
         ...repoDeets,
@@ -416,6 +431,10 @@ async function run() {
   }
   // Set to constant to avoid mutation later on.
   const pr = prContext;
+
+  // Get code owners
+  await fetchCodeOwners(octokit, repoDeets, pr);
+  const codeowners = new Codeowners(process.cwd());
 
   const changedFiles = await getChangedFiles(octokit, repoDeets, pr.number);
   let labelConfigs = [];
@@ -553,7 +572,7 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
   // Merge
   core.info(`Merging PR`);
   const {
-    head: { sha }
+    head: { sha },
   } = pr;
   try {
     await octokit.pulls.merge({
