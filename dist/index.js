@@ -402,10 +402,10 @@ function getPayloadBody() {
 }
 
 async function fetchCodeOwners(ocktokit, repoDeets, pr) {
-  const cwd = core.getInput("cwd") || ".";
+  const cwd = core.getInput("cwd") || "";
   const response = await ocktokit.repos.getContent({
     ...repoDeets,
-    path: cwd + "/CODEOWNERS",
+    path: cwd + "CODEOWNERS",
     ref: pr.base.sha,
   });
 
