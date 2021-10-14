@@ -584,6 +584,7 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
     }
     core.info(`Merging (or commenting) failed:`);
     core.error(error);
+    core.error(error.message);
     core.setFailed("Failed to merge");
     process.exit(1);
   }
