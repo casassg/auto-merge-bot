@@ -403,17 +403,23 @@ function getPayloadBody() {
 
 async function fetchCodeOwners(ocktokit, repoDeets, pr) {
   const cwd = core.getInput("cwd") || "";
-  const response = await ocktokit.repos.getContent({
-    ...repoDeets,
-    path: cwd + "CODEOWNERS",
-    ref: pr.base.sha,
-  });
 
-  const buff = Buffer.from(
-    response.data.content,
-    response.data.encoding
-  ).toString();
-  fs.writeFileSync(process.cwd() + "/CODEOWNERS", buff);
+  try {
+    const response = await ocktokit.repos.getContent({
+      ...repoDeets,
+      path: cwd + "CODEOWNERS",
+      ref: pr.base.sha,
+    });
+    const buff = Buffer.from(
+      response.data.content,
+      response.data.encoding
+    ).toString();
+    fs.writeFileSync(process.cwd() + "/CODEOWNERS", buff);
+  } catch (error) {
+    core.error(error);
+    core.info("Error trying to find CODEOWNERS file. Please set cwd properly.");
+    return;
+  }
 }
 
 // Effectively the main function
