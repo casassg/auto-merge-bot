@@ -405,11 +405,11 @@ async function run() {
   // Setup
   const codeowners = new Codeowners(core.getInput("cwd") || process.cwd());
   const octokit = getOctokit(process.env.GITHUB_TOKEN);
-  let pr = context.payload.pull_request;
+  let prContext = context.payload.pull_request;
   const repoDeets = { owner: context.repo.owner, repo: context.repo.repo };
   if (context.payload.issue){
     try {
-      ({ data: pr } = await octokit.pulls.get({
+      ({ data: prContext } = await octokit.pulls.get({
         ...repoDeets,
         pull_number: context.payload.issue.number,
       }));
@@ -421,6 +421,8 @@ async function run() {
       return;
     }
   }
+  // Set to constant to avoid mutation later on.
+  const pr = prContext;
 
   const changedFiles = await getChangedFiles(octokit, repoDeets, pr.number);
   let labelConfigs = [];
@@ -562,14 +564,16 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
   } = pr;
   try {
     await octokit.pulls.merge({
-      ...repoDeets,
+      owner: pr.base.repo.owner.login,
+      repo: pr.base.repo.name,
       pull_number: pr.number,
       sha: sha,
       // @ts-ignore
       merge_method: core.getInput("merge_method") || "squash",
     });
     await octokit.issues.createComment({
-      ...repoDeets,
+      owner: pr.base.repo.owner.login,
+      repo: pr.base.repo.name,
       issue_number: pr.number,
       body: `Merged with approvals from ${formatArray(
         Array.from(new Set(approved))
