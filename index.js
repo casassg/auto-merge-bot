@@ -550,10 +550,14 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
 
   // Merge
   core.info(`Merging PR`);
+  const {
+    head: { sha }
+  } = pr;
   try {
     await octokit.pulls.merge({
       ...repoDeets,
       pull_number: pr.number,
+      sha: sha,
       // @ts-ignore
       merge_method: core.getInput("merge_method") || "squash",
     });
