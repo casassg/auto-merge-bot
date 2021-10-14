@@ -579,7 +579,7 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
         );
         labelConfigs.push(needsManualMergeLabel);
         await setLabels(octokit, repoDeets, labelConfigs, pr.number);
-        process.exit(0);
+        // process.exit(0);
       }
     }
     core.info(`Merging (or commenting) failed:`);
