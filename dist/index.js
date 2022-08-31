@@ -87,13 +87,14 @@ function isCommentValid(
   regex,
   owners,
   pr,
-  extra_validation = false
+  extra_validation = false,
+  allow_author = false
 ) {
   return (
     !body.includes(ourSignature) &&
     (body.match(regex) || extra_validation) &&
     (owners.length === 0 || owners.includes("@" + author)) &&
-    author !== pr.user.login
+    (allow_author || author !== pr.user.login)
   );
 }
 
@@ -321,7 +322,7 @@ async function hasMergeCommand(octokit, repoDeeets, pr, owners) {
     issue_number: pr.number,
   });
   let hasMergeCommand = comments.data.find((c) =>
-    isCommentValid(c.body, c.user.login, mergeRegex, owners, pr)
+    isCommentValid(c.body, c.user.login, mergeRegex, owners, pr, false, true)
   );
   if (hasMergeCommand) {
     core.info(`Found merge comment from ${hasMergeCommand.user.login}`);
