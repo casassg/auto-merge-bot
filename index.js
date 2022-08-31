@@ -546,10 +546,10 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
     process.exit(1);
   }
   labelConfigs.push(lgtmLabel);
-  if (!(await hasMergeCommand(octokit, repoDeets, pr, approverOwners))) {
+  if (!(await hasMergeCommand(octokit, repoDeets, pr, owners))) {
     labelConfigs.push(needsMergeLabel);
     core.info(
-      `Missing /merge command by an owner: ${formatArray(approverOwners)}`
+      `Missing /merge command by an owner: ${formatArray(owners)}`
     );
     await sendCommentUpdate(
       octokit,
