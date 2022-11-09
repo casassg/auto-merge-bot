@@ -518,7 +518,7 @@ async function run() {
   const approverOwners = owners.filter((o) => o !== "@" + pr.user.login);
   await new Promise((resolve) => setTimeout(resolve, 5000));
   if (approverOwners.length === 0) {
-    core.info(
+    logSummary(
       "Seems PR user is only owner. Will accept anyone to merge or approve."
     );
     await welcomeMessage(
