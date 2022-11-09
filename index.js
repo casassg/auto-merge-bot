@@ -56,6 +56,11 @@ function getFilesNotOwnedByCodeOwner(owner, files, codeowners) {
   return filesWhichArentOwned;
 }
 
+function logSummary(comment){
+  core.info(comment)
+  core.summary.addRaw(comment).addEOL().write()
+}
+
 async function sendCommentUpdate(
   octokit,
   repoDeets,
@@ -347,7 +352,7 @@ async function isApproved(
 
   const approvers = await getApprovers(octokit, repoDeeets, pr, owners);
   if (approvers.length === 0) {
-    core.info(
+    logSummary(
       `Missing approvals for PR. Potential owners: ${formatArray(owners)}`
     );
     return false;
@@ -369,7 +374,7 @@ async function isApproved(
 
   let missingOwners = getCodeOwners(changedFilesNotApproved, codeowners);
   if (missingOwners.length > 0 && changedFilesNotApproved.length > 0) {
-    core.info(
+    logSummary(
       `Missing files to be approved: ${changedFilesNotApproved}. Potential owners: ${formatArray(
         missingOwners
       )}`
@@ -377,7 +382,7 @@ async function isApproved(
     return false;
   }
   if (changedFilesNotApproved.length > 0 && missingOwners.length === 0) {
-    core.info(
+    logSummary(
       `Files without explicit ownership: ${changedFilesNotApproved}. Continuing merge since we assume this is okay!`
     );
   }
@@ -549,7 +554,7 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
   labelConfigs.push(lgtmLabel);
   if (!(await hasMergeCommand(octokit, repoDeets, pr, owners))) {
     labelConfigs.push(needsMergeLabel);
-    core.info(
+    logSummary(
       `Missing /merge command by an owner: ${formatArray(owners)}`
     );
     await sendCommentUpdate(
@@ -565,7 +570,7 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
   labelConfigs.push(mergeReadyLabel);
   await setLabels(octokit, repoDeets, labelConfigs, pr.number);
   if (!(await isCheckSuiteGreen(octokit, repoDeets, pr))) {
-    core.info("Check suite not green");
+    logSummary("Check suite not green");
     await sendCommentUpdate(
       octokit,
       repoDeets,
@@ -601,7 +606,7 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
   } catch (error) {
     for (const changedFile of changedFiles) {
       if (changedFile.includes(".github/workflows")) {
-        core.info(
+        logSummary(
           `Automerge is not available for PRs modifying GitHub Actions. See https://github.com/casassg/auto-merge-bot/issues/1`
         );
         labelConfigs.push(needsManualMergeLabel);
@@ -621,6 +626,7 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
 if (!module.parent) {
   try {
     run();
+    
   } catch (error) {
     core.setFailed(error.message);
     throw error;
