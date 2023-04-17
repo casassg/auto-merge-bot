@@ -17,10 +17,10 @@ inputs:
     default: "squash"
     required: false
   assign_reviewer:
-    description: "Wether to assign or not a reviewer"
+    description: "Whether to assign or not a reviewer"
     default: "true"
     required: false
 
 runs:
-  using: "node12"
+  using: "node16"
   main: "dist/index.js"
