@@ -170,7 +170,7 @@ async function isCheckSuiteGreen(octokit, repoDeeets, pr) {
     failedRun = checkSuites.data.check_runs.find(
       (s) =>
         s.status === "completed" &&
-        !["success", "neutral"].includes(s.conclusion) &&
+        !["success", "neutral", "skipped"].includes(s.conclusion) &&
         s.name !== process.env.GITHUB_JOB
     );
     // if failed, returne false
@@ -626,7 +626,7 @@ Seems you are only owner for changes on this PR. Any user can use \`/merge\` or 
 if (!module.parent) {
   try {
     run();
-    
+
   } catch (error) {
     core.setFailed(error.message);
     throw error;
